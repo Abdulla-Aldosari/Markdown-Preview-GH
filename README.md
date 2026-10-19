@@ -1,4 +1,10 @@
-# Markdown Preview GH
+<!-- LOGO_START -->
+<p align="center">
+  <img src="images/logo256.png" width="80" alt="Markdown Preview GH" />
+</p>
+<!-- LOGO_END -->
+
+<h1 align="center">Markdown Preview GH</h1>
 
 Brings GitHub's native rendering style and behavior directly into VS Code's built-in Markdown preview, so you can see exactly how your Markdown will look once it's pushed to GitHub.
 
