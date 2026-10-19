@@ -1,0 +1,2 @@
+npm run typecheck || exit 1
+npm test || exit 1

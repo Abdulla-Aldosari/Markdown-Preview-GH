@@ -1,0 +1,8 @@
+node_modules
+.vscode/settings.json
+.mindstream/
+.cline/
+.vsenv/
+dist/
+*.vsix
+build/theme-audit/manual-surface.html

@@ -1,0 +1,6 @@
+package-lock.json
+build/base-styles.css
+build/palettes/
+src/styles/syntax-highlighting.css
+dist/
+.vscode/

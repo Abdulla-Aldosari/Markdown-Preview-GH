@@ -1,0 +1,276 @@
+/*!
+  GitHub syntax highlighting colors for highlight.js (.hljs-*).
+  Colors are the GitHub "prettylights" palette for light and dark themes.
+*/
+
+.mpgh-body {
+  --syntax-comment: #59636e;
+  --syntax-constant: #0550ae;
+  --syntax-entity: #6639ba;
+  --syntax-entity-tag: #0550ae;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-variable: #953800;
+  --syntax-markup-heading: #0550ae;
+  --syntax-markup-list: #3b2300;
+  --syntax-inserted-text: #116329;
+  --syntax-inserted-bg: #dafbe1;
+  --syntax-deleted-text: #82071e;
+  --syntax-deleted-bg: #ffebe9;
+
+  --syntax-json-attr: #116329;
+  --syntax-css-selector-class: #800000;
+  --syntax-css-attribute: #e50000;
+  --syntax-css-number: #098658;
+  --syntax-css-selector-pseudo: #e50000;
+  --syntax-scss-variable: #953800;
+  --syntax-scss-selector-class: #800000;
+  --syntax-scss-attribute: #e50000;
+  --syntax-scss-selector-pseudo: #e50000;
+  --syntax-less-variable: #0550ae;
+  --syntax-less-number: #0451a5;
+  --syntax-less-selector-class: #e50000;
+  --syntax-less-attribute: #e50000;
+  --syntax-yaml-attr: #800000;
+  --syntax-toml-section: #a047ff;
+  --syntax-toml-attr: #a31515;
+}
+
+.mpgh-body[data-theme-mode="dark"],
+.vscode-body.vscode-dark .mpgh-body[data-theme-mode="auto"] {
+  --syntax-comment: #9198a1;
+  --syntax-constant: #79c0ff;
+  --syntax-entity: #d2a8ff;
+  --syntax-entity-tag: #7ee787;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-variable: #ffa657;
+  --syntax-markup-heading: #1f6feb;
+  --syntax-markup-list: #f2cc60;
+  --syntax-inserted-text: #aff5b4;
+  --syntax-inserted-bg: #033a16;
+  --syntax-deleted-text: #ffdcd7;
+  --syntax-deleted-bg: #67060c;
+
+  --syntax-json-attr: #7ee787;
+  --syntax-css-selector-class: #d7ba7d;
+  --syntax-css-attribute: #9cdcfe;
+  --syntax-css-number: #b5cea8;
+  --syntax-css-selector-pseudo: #9cdcfe;
+  --syntax-scss-variable: #ffa657;
+  --syntax-scss-selector-class: #d7ba7d;
+  --syntax-scss-attribute: #9cdcfe;
+  --syntax-scss-selector-pseudo: #9cdcfe;
+  --syntax-less-variable: #79c0ff;
+  --syntax-less-number: #ce9178;
+  --syntax-less-selector-class: #d2a8ff;
+  --syntax-less-attribute: #9cdcfe;
+  --syntax-yaml-attr: #7ee787;
+  --syntax-toml-section: #d2a8ff;
+  --syntax-toml-attr: #f0f6fc;
+}
+
+@media (prefers-color-scheme: dark) {
+  .mpgh-body[data-theme-mode="system"] {
+    --syntax-comment: #9198a1;
+    --syntax-constant: #79c0ff;
+    --syntax-entity: #d2a8ff;
+    --syntax-entity-tag: #7ee787;
+    --syntax-keyword: #ff7b72;
+    --syntax-string: #a5d6ff;
+    --syntax-variable: #ffa657;
+    --syntax-markup-heading: #1f6feb;
+    --syntax-markup-list: #f2cc60;
+    --syntax-inserted-text: #aff5b4;
+    --syntax-inserted-bg: #033a16;
+    --syntax-deleted-text: #ffdcd7;
+    --syntax-deleted-bg: #67060c;
+
+    --syntax-json-attr: #7ee787;
+    --syntax-css-selector-class: #d7ba7d;
+    --syntax-css-attribute: #9cdcfe;
+    --syntax-css-number: #b5cea8;
+    --syntax-css-selector-pseudo: #9cdcfe;
+    --syntax-scss-variable: #ffa657;
+    --syntax-scss-selector-class: #d7ba7d;
+    --syntax-scss-attribute: #9cdcfe;
+    --syntax-scss-selector-pseudo: #9cdcfe;
+    --syntax-less-variable: #79c0ff;
+    --syntax-less-number: #ce9178;
+    --syntax-less-selector-class: #d2a8ff;
+    --syntax-less-attribute: #9cdcfe;
+    --syntax-yaml-attr: #7ee787;
+    --syntax-toml-section: #d2a8ff;
+    --syntax-toml-attr: #f0f6fc;
+  }
+}
+
+.mpgh-body .hljs,
+.mpgh-body pre > code {
+  color: var(--fgColor-default);
+  background: var(--bgColor-muted);
+}
+
+.mpgh-body .hljs-function,
+.mpgh-body .hljs-params {
+  color: var(--fgColor-default);
+}
+
+.mpgh-body .hljs-doctag,
+.mpgh-body .hljs-keyword,
+.mpgh-body .hljs-meta .hljs-keyword,
+.mpgh-body .hljs-template-tag,
+.mpgh-body .hljs-template-variable,
+.mpgh-body .hljs-type,
+.mpgh-body .hljs-variable.language_ {
+  color: var(--syntax-keyword);
+}
+
+.mpgh-body .hljs-title,
+.mpgh-body .hljs-title.class_,
+.mpgh-body .hljs-title.class_.inherited__,
+.mpgh-body .hljs-title.function_ {
+  color: var(--syntax-entity);
+}
+
+.mpgh-body .hljs-attr,
+.mpgh-body .hljs-attribute,
+.mpgh-body .hljs-literal,
+.mpgh-body .hljs-meta,
+.mpgh-body .hljs-number,
+.mpgh-body .hljs-operator,
+.mpgh-body .hljs-selector-attr,
+.mpgh-body .hljs-selector-class,
+.mpgh-body .hljs-selector-id,
+.mpgh-body .hljs-variable {
+  color: var(--syntax-constant);
+}
+
+.mpgh-body .hljs-meta .hljs-string,
+.mpgh-body .hljs-regexp,
+.mpgh-body .hljs-string {
+  color: var(--syntax-string);
+}
+
+.mpgh-body .hljs-built_in,
+.mpgh-body .hljs-symbol {
+  color: var(--syntax-variable);
+}
+
+.mpgh-body .hljs-code,
+.mpgh-body .hljs-comment,
+.mpgh-body .hljs-formula {
+  color: var(--syntax-comment);
+}
+
+.mpgh-body .hljs-name,
+.mpgh-body .hljs-quote,
+.mpgh-body .hljs-selector-pseudo,
+.mpgh-body .hljs-selector-tag {
+  color: var(--syntax-entity-tag);
+}
+
+.mpgh-body .hljs-subst {
+  color: var(--fgColor-default);
+}
+
+.mpgh-body .hljs-section {
+  color: var(--syntax-markup-heading);
+  font-weight: bold;
+}
+
+.mpgh-body .hljs-bullet {
+  color: var(--syntax-markup-list);
+}
+
+.mpgh-body .hljs-emphasis {
+  color: var(--fgColor-default);
+  font-style: italic;
+}
+
+.mpgh-body .hljs-strong {
+  color: var(--fgColor-default);
+  font-weight: bold;
+}
+
+.mpgh-body .hljs-addition {
+  color: var(--syntax-inserted-text);
+  background-color: var(--syntax-inserted-bg);
+}
+
+.mpgh-body .hljs-deletion {
+  color: var(--syntax-deleted-text);
+  background-color: var(--syntax-deleted-bg);
+}
+
+/* Per-language overrides */
+
+.mpgh-body code.language-json .hljs-attr {
+  color: var(--syntax-json-attr);
+}
+
+.mpgh-body code.language-css .hljs-selector-class {
+  color: var(--syntax-css-selector-class);
+}
+
+.mpgh-body code.language-css .hljs-attribute {
+  color: var(--syntax-css-attribute);
+}
+
+.mpgh-body code.language-css .hljs-number {
+  color: var(--syntax-css-number);
+}
+
+.mpgh-body code.language-css .hljs-selector-pseudo {
+  color: var(--syntax-css-selector-pseudo);
+}
+
+.mpgh-body code.language-scss .hljs-variable {
+  color: var(--syntax-scss-variable);
+}
+
+.mpgh-body code.language-scss .hljs-selector-class {
+  color: var(--syntax-scss-selector-class);
+}
+
+.mpgh-body code.language-scss .hljs-attribute {
+  color: var(--syntax-scss-attribute);
+}
+
+.mpgh-body code.language-scss .hljs-selector-pseudo {
+  color: var(--syntax-scss-selector-pseudo);
+}
+
+.mpgh-body code.language-less .hljs-variable {
+  color: var(--syntax-less-variable);
+}
+
+.mpgh-body code.language-less .hljs-number {
+  color: var(--syntax-less-number);
+}
+
+.mpgh-body code.language-less .hljs-selector-class {
+  color: var(--syntax-less-selector-class);
+}
+
+.mpgh-body code.language-less .hljs-attribute {
+  color: var(--syntax-less-attribute);
+}
+
+.mpgh-body code.language-yaml .hljs-attr {
+  color: var(--syntax-yaml-attr);
+}
+
+.mpgh-body code.language-toml .hljs-section {
+  color: var(--syntax-toml-section);
+}
+
+.mpgh-body code.language-toml .hljs-attr {
+  color: var(--syntax-toml-attr);
+}
+
+.mpgh-body code.language-diff .hljs-addition,
+.mpgh-body code.language-diff .hljs-deletion {
+  width: unset;
+}
+

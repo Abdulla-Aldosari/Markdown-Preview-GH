@@ -1,0 +1,233 @@
+html,
+body,
+.mpgh-body {
+    padding: 0 !important;
+    max-width: auto !important;
+}
+
+.mpgh-body {
+    background-color: var(--bgColor-default);
+    color: var(--fgColor-default);
+}
+
+.mpgh-body {
+    border: 1px solid transparent;
+    box-sizing: border-box;
+    margin: 0 auto;
+    width: 100% !important;
+}
+
+.mpgh-content {
+    padding: 32px !important;
+    max-width: 838px;
+    min-width: 200px;
+    margin: 0 auto;
+}
+
+.mpgh-content[data-content-width='narrow'] {
+    max-width: 640px;
+}
+
+.mpgh-content[data-content-width='normal'] {
+    max-width: 838px;
+}
+
+.mpgh-content[data-content-width='wide'] {
+    max-width: 1024px;
+}
+
+.mpgh-content[data-content-width='full'] {
+    max-width: 1200px;
+}
+
+.vscode-body.scrollBeyondLastLine {
+    margin-bottom: 0;
+}
+
+.vscode-body.scrollBeyondLastLine > .markdown-body > .mpgh-body {
+    padding-bottom: calc(100vh + 10px) !important;
+}
+
+.mpgh-body a {
+    text-decoration: underline !important;
+    text-underline-offset: 0.2rem;
+    background-color: transparent;
+}
+
+.mpgh-body blockquote {
+    background-color: initial;
+}
+
+.mpgh-body pre {
+    color: initial;
+    border: none;
+}
+
+.mpgh-body code {
+    color: inherit;
+}
+
+.mpgh-body pre code {
+    color: initial;
+}
+
+.mpgh-body code > div {
+    background: none;
+}
+
+.mpgh-body.showEditorSelection .code-line .code-line:hover:before {
+    border-left: none;
+}
+
+.mpgh-body p,
+.mpgh-body blockquote,
+.mpgh-body ul,
+.mpgh-body ol,
+.mpgh-body dl,
+.mpgh-body table,
+.mpgh-body pre {
+    margin-top: 16px;
+    margin-bottom: 16px;
+}
+
+:is(.vscode-dark, .vscode-light).showEditorSelection .code-active-line:before {
+    border-left: 3px solid var(--borderColor-default);
+}
+:is(.vscode-dark, .vscode-light).showEditorSelection .code-line:hover:before {
+    border-left: 3px solid var(--fgColor-muted);
+}
+
+/* GitHub-style code block copy button */
+.mpgh-body .code-block-copy-button {
+    opacity: 1 !important;
+    border: none !important;
+    background-color: transparent !important;
+    border-radius: 6px;
+    color: var(--fgColor-muted);
+}
+
+.mpgh-body .code-block-copy-button:hover {
+    background-color: var(--bgColor-neutral-muted) !important;
+}
+
+.mpgh-body .code-block-copy-button svg {
+    display: none;
+}
+
+.mpgh-body .code-block-copy-button::before {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 16px;
+    background-color: currentColor;
+    -webkit-mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M0%206.75C0%205.784.784%205%201.75%205h1.5a.75.75%200%200%201%200%201.5h-1.5a.25.25%200%200%200-.25.25v7.5c0%20.138.112.25.25.25h7.5a.25.25%200%200%200%20.25-.25v-1.5a.75.75%200%200%201%201.5%200v1.5A1.75%201.75%200%200%201%209.25%2016h-7.5A1.75%201.75%200%200%201%200%2014.25Z%22%2F%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M5%201.75C5%20.784%205.784%200%206.75%200h7.5C15.216%200%2016%20.784%2016%201.75v7.5A1.75%201.75%200%200%201%2014.25%2011h-7.5A1.75%201.75%200%200%201%205%209.25Zm1.75-.25a.25.25%200%200%200-.25.25v7.5c0%20.138.112.25.25.25h7.5a.25.25%200%200%200%20.25-.25v-7.5a.25.25%200%200%200-.25-.25Z%22%2F%3E%3C%2Fsvg%3E')
+        center / 16px 16px no-repeat;
+    mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M0%206.75C0%205.784.784%205%201.75%205h1.5a.75.75%200%200%201%200%201.5h-1.5a.25.25%200%200%200-.25.25v7.5c0%20.138.112.25.25.25h7.5a.25.25%200%200%200%20.25-.25v-1.5a.75.75%200%200%201%201.5%200v1.5A1.75%201.75%200%200%201%209.25%2016h-7.5A1.75%201.75%200%200%201%200%2014.25Z%22%2F%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M5%201.75C5%20.784%205.784%200%206.75%200h7.5C15.216%200%2016%20.784%2016%201.75v7.5A1.75%201.75%200%200%201%2014.25%2011h-7.5A1.75%201.75%200%200%201%205%209.25Zm1.75-.25a.25.25%200%200%200-.25.25v7.5c0%20.138.112.25.25.25h7.5a.25.25%200%200%200%20.25-.25v-7.5a.25.25%200%200%200-.25-.25Z%22%2F%3E%3C%2Fsvg%3E')
+        center / 16px 16px no-repeat;
+}
+
+.mpgh-body .code-block-copy-button.copied {
+    color: var(--fgColor-success);
+}
+
+.mpgh-body .code-block-copy-button.copied::before {
+    -webkit-mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M13.78%204.22a.75.75%200%200%201%200%201.06l-7.25%207.25a.75.75%200%200%201-1.06%200L2.22%209.28a.751.751%200%200%201%20.018-1.042.751.751%200%200%201%201.042-.018L6%2010.94l6.72-6.72a.75.75%200%200%201%201.06%200Z%22%2F%3E%3C%2Fsvg%3E')
+        center / 16px 16px no-repeat;
+    mask: url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M13.78%204.22a.75.75%200%200%201%200%201.06l-7.25%207.25a.75.75%200%200%201-1.06%200L2.22%209.28a.751.751%200%200%201%20.018-1.042.751.751%200%200%201%201.042-.018L6%2010.94l6.72-6.72a.75.75%200%200%201%201.06%200Z%22%2F%3E%3C%2Fsvg%3E')
+        center / 16px 16px no-repeat;
+}
+
+/*
+ * RTL direction support.
+ * The GitHub-generated theme stylesheets (dist/theme-*.css) and VS Code's
+ * own built-in markdown.css hardcode left-side borders/margins assuming LTR content.
+ * These overrides mirror them to the right when the root container is explicitly RTL.
+ */
+.mpgh-body[dir='rtl'] blockquote {
+    border-left: none;
+    border-right: 0.25em solid var(--borderColor-default);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert {
+    border-left: none;
+    border-right: 0.25em solid var(--borderColor-default);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert.markdown-alert-note {
+    border-right-color: var(--borderColor-accent-emphasis);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert.markdown-alert-important {
+    border-right-color: var(--borderColor-done-emphasis);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert.markdown-alert-warning {
+    border-right-color: var(--borderColor-attention-emphasis);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert.markdown-alert-tip {
+    border-right-color: var(--borderColor-success-emphasis);
+}
+
+.mpgh-body[dir='rtl'] .markdown-alert.markdown-alert-caution {
+    border-right-color: var(--borderColor-danger-emphasis);
+}
+
+.mpgh-body[dir='rtl'] .mr-2 {
+    margin-right: 0 !important;
+    margin-left: var(--base-size-8, 8px) !important;
+}
+
+/*
+ * Print output (used by the 'Print...' command, which prints the exported page
+ * from the browser). Removes preview-only chrome and avoids splitting blocks
+ * across pages.
+ */
+@media print {
+    .mpgh-body {
+        border: none;
+        padding-bottom: 0 !important;
+    }
+
+    .mpgh-content {
+        max-width: none !important;
+        padding: 0 !important;
+    }
+
+    .mpgh-body pre,
+    .mpgh-body img,
+    .mpgh-body .markdown-alert {
+        break-inside: avoid;
+    }
+
+    /*
+     * Tables are allowed to split across pages instead of being forced
+     * whole onto the next page (which would otherwise leave a large blank
+     * gap whenever a table is taller than the remaining page space, as
+     * happens with long reference tables). Only a single row is protected
+     * from being cut in half, and the header row repeats on every page so
+     * split tables stay readable.
+     */
+    .mpgh-body table thead {
+        display: table-header-group;
+    }
+
+    .mpgh-body table tr {
+        break-inside: avoid;
+    }
+
+    .mpgh-body h1,
+    .mpgh-body h2,
+    .mpgh-body h3,
+    .mpgh-body h4,
+    .mpgh-body h5,
+    .mpgh-body h6 {
+        break-after: avoid;
+    }
+
+    .mpgh-body .code-block-copy-button,
+    .code-active-line:before,
+    .code-line:hover:before {
+        display: none !important;
+    }
+}

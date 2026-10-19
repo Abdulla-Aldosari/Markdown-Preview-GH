@@ -1,0 +1,16 @@
+node_modules/
+.mindstream/
+.vscode/
+.cline/
+.husky/
+.vsenv/
+test/
+src/
+build/
+docs/*.md
+.gitignore
+.prettierignore
+commitlint.config.js
+cliff.toml
+tsconfig.json
+**/*.map

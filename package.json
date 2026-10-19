@@ -1,0 +1,228 @@
+{
+  "name": "markdown-preview-gh",
+  "displayName": "Markdown Preview GH",
+  "description": "Brings GitHub's own styling and rendering details to VS Code's built-in Markdown preview.",
+  "version": "1.0.0",
+  "publisher": "Abdulla-Aldosari",
+  "license": "MIT",
+  "icon": "images/logo256.png",
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "repository": {
+    "url": "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/issues"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "github",
+    "gfm",
+    "theme"
+  ],
+  "activationEvents": [],
+  "main": "dist/extension.js",
+  "browser": "dist/extension.js",
+  "contributes": {
+    "markdown.markdownItPlugins": true,
+    "markdown.previewScripts": [
+      "./dist/mermaid-theme-sync.js"
+    ],
+    "markdown.previewStyles": [
+      "./dist/overrides.css",
+      "./dist/preview-base.css",
+      "./dist/theme-light.css",
+      "./dist/theme-dark.css",
+      "./dist/syntax-highlighting.css"
+    ],
+    "configuration": {
+      "title": "Markdown Preview GH",
+      "properties": {
+        "markdown-preview-gh.colorTheme": {
+          "type": "string",
+          "order": 0,
+          "description": "Determines how the preview picks its GitHub color theme.",
+          "enum": [
+            "auto",
+            "dark",
+            "light"
+          ],
+          "enumItemLabels": [
+            "Match the editor theme",
+            "Dark",
+            "Light"
+          ],
+          "enumDescriptions": [
+            "Use the GitHub theme that matches the editor's light/dark color theme.",
+            "Always display the preview with GitHub's dark theme.",
+            "Always display the preview with GitHub's light theme."
+          ],
+          "default": "auto"
+        },
+        "markdown-preview-gh.contentDirection": {
+          "type": "string",
+          "order": 1,
+          "description": "Content direction for the Markdown preview content.",
+          "enum": [
+            "ltr",
+            "rtl",
+            "auto"
+          ],
+          "enumDescriptions": [
+            "Left to right (default)",
+            "Right to left",
+            "Detect automatically from the content"
+          ],
+          "default": "ltr"
+        },
+        "markdown-preview-gh.contentWidth": {
+          "type": "string",
+          "order": 2,
+          "description": "Content width for the Markdown preview. The `normal` value (838px) matches GitHub's content width.",
+          "enum": [
+            "narrow",
+            "normal",
+            "wide",
+            "full"
+          ],
+          "enumDescriptions": [
+            "Narrow (640px)",
+            "Normal (838px) - GitHub's width",
+            "Wide (1024px)",
+            "Full (1200px)"
+          ],
+          "default": "normal"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "markdown-preview-gh.setContentDirection",
+        "title": "Content Direction...",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.setContentWidth",
+        "title": "Content Width...",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.resetPreferences",
+        "title": "Reset Preferences for this file",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.setColorMode",
+        "title": "Theme...",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.openInBrowser",
+        "title": "Open in Browser",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.print",
+        "title": "Print...",
+        "category": "Markdown Preview GH"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "markdown-preview-gh.setContentDirection",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.setContentWidth",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.resetPreferences",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.setColorMode",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.openInBrowser",
+          "when": "editorLangId == markdown && !isWeb"
+        },
+        {
+          "command": "markdown-preview-gh.print",
+          "when": "editorLangId == markdown && !isWeb"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "markdown-preview-gh.openInBrowser",
+          "when": "webviewId == 'markdown.preview' && !isWeb",
+          "group": "z_gmpExport@1"
+        },
+        {
+          "command": "markdown-preview-gh.print",
+          "when": "webviewId == 'markdown.preview' && !isWeb",
+          "group": "z_gmpExport@2"
+        },
+        {
+          "command": "markdown-preview-gh.setContentWidth",
+          "when": "webviewId == 'markdown.preview'",
+          "group": "z_gmpPrefs@1"
+        },
+        {
+          "command": "markdown-preview-gh.setContentDirection",
+          "when": "webviewId == 'markdown.preview'",
+          "group": "z_gmpPrefs@2"
+        },
+        {
+          "command": "markdown-preview-gh.setColorMode",
+          "when": "webviewId == 'markdown.preview'",
+          "group": "z_gmpPrefs@3"
+        },
+        {
+          "command": "markdown-preview-gh.resetPreferences",
+          "when": "webviewId == 'markdown.preview'",
+          "group": "z_gmpPrefs@4"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node ./build/generate-theme-css.mts && node ./build/bundle.mts --production",
+    "build": "node ./build/generate-theme-css.mts && node ./build/bundle.mts",
+    "watch": "node ./build/bundle.mts --watch",
+    "changelog": "git-cliff -o CHANGELOG.md",
+    "package": "vsce package",
+    "prepare": "husky",
+    "prettier": "prettier --write .",
+    "prettier:check": "prettier --check .",
+    "sync:themes": "node ./build/sync-themes.mts",
+    "audit:themes": "node ./build/theme-audit/audit.mts",
+    "test": "node --test \"test/**/*.test.mts\"",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@types/markdown-it": "12.2.3",
+    "@types/node": "^22.5.5",
+    "@types/vscode": "1.106.0",
+    "esbuild": "^0.28.2",
+    "git-cliff": "^2.14.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "markdown-it": "12.3.2",
+    "postcss": "8.5.30",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2"
+  },
+  "lint-staged": {
+    "*.{js,mjs,cjs,ts,mts,cts,json,css,md}": "prettier --write"
+  }
+}

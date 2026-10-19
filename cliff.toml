@@ -1,0 +1,139 @@
+# git-cliff ~ configuration file
+# https://git-cliff.org/docs/configuration
+
+[remote.github]
+owner = "Abdulla-Aldosari"
+repo = "Markdown-Preview-GH"
+
+[changelog]
+header = """
+All notable changes to **[Markdown Preview GH](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH)** are documented here.<br>
+"""
+
+# A template to be rendered for each release in the changelog.
+body = """
+{%- macro repo_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+
+{% macro render_commit(commit) -%}
+    - {% if commit.scope %}*({{ commit.scope }})* {% endif %}\
+        {% if commit.breaking %}[**breaking**] {% endif %}\
+        {{ commit.message | upper_first }} - \
+        ([{{ commit.id | truncate(length=7, end="") }}]({{ self::repo_url() }}/commit/{{ commit.id }}))\
+{% endmacro -%}
+
+{% if version %}\
+    {% if previous.version %}\
+        ## [{{ version | trim_start_matches(pat="v") }}]\
+          ({{ self::repo_url() }}/compare/{{ previous.version }}..{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+    {% else %}\
+        ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+    {% endif %}\
+{% else %}\
+    ## [unreleased]
+{% endif %}\
+
+{% if version == "v1.0.0" or version == "1.0.0" %}
+- Initial release
+{% else %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits
+    | filter(attribute="scope")
+    | sort(attribute="scope") %}
+        {{ self::render_commit(commit=commit) }}
+    {%- endfor %}
+    {% for commit in commits %}
+        {%- if not commit.scope -%}
+            {{ self::render_commit(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+{% endfor -%}
+{%- if github -%}
+{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
+  ## ❤️ New Contributors
+{% endif %}\
+{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
+  * @{{ contributor.username }} made their first contribution
+    {%- if contributor.pr_number %} in \
+      [#{{ contributor.pr_number }}]({{ self::repo_url() }}/pull/{{ contributor.pr_number }}) \
+    {%- endif %}
+{%- endfor -%}
+{%- endif %}
+{% endif %}
+
+"""
+
+# A template to be rendered as the changelog's footer.
+footer = ""
+
+# Remove leading and trailing whitespaces from the changelog's body.
+trim = true
+
+# An array of regex based postprocessors to modify the changelog.
+postprocessors = [
+  # Replace the placeholder `<REPO>` with a URL.
+  { pattern = "<REPO>", replace = "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH" }, # replace repository URL
+]
+
+[git]
+# Parse commits according to the conventional commits specification.
+# See https://www.conventionalcommits.org
+conventional_commits = true
+
+# Exclude commits that do not match the conventional commits specification.
+filter_unconventional = true
+
+# Split commits on newlines, treating each line as an individual commit.
+split_commits = false
+
+# An array of regex based parsers to modify commit messages prior to further processing.
+commit_preprocessors = [
+  # Replace issue numbers with link templates to be updated in `changelog.postprocessors`.
+  { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))" },
+]
+
+# An array of regex based parsers for extracting data from the commit message.
+# Assigns commits to groups.
+# Optionally sets the commit's scope and can decide to exclude commits from further processing.
+commit_parsers = [
+  # Negative scopes: skip small internal commits (feat/fix/perf only) so they
+  # stay out of the changelog. Placed above the breaking-change parser so a
+  # negative scope wins even over breaking commits.
+  { message = "^(feat|fix|perf)\\(-.*\\)", skip = true },
+
+  # Breaking changes: matches type(optional-scope)!: regardless of type
+  { message = "^[a-z]+(\\([^)]*\\))?!:", group = "<!-- 0 -->⚠️ Important Changes" },
+
+  { message = "^feat",    group = "<!-- 1 -->🚀 Features" },
+  { message = "^fix",     group = "<!-- 2 -->🐛 Bug Fixes" },
+  { message = "^perf",    group = "<!-- 3 -->⚡ Performance" },
+
+  # Everything else is internal - hidden from the user-facing changelog
+  { message = ".*",       skip = true },
+]
+
+# Prevent commits that are breaking from being excluded by commit parsers.
+protect_breaking_commits = false
+
+# Exclude commits that are not matched by any commit parser.
+filter_commits = false
+
+# Regex to select git tags that represent releases.
+tag_pattern = "v[0-9].*"
+
+# Regex to select git tags that do not represent proper releases.
+# Takes precedence over `tag_pattern`.
+# Changes belonging to these releases will be included in the next release.
+skip_tags = "beta|alpha"
+
+# Regex to exclude git tags after applying the tag_pattern.
+ignore_tags = ""
+
+# Order releases topologically instead of chronologically.
+topo_order = false
+
+# Order of commits in each group/release within the changelog.
+# Allowed values: newest, oldest
+sort_commits = "newest"

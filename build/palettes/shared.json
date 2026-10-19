@@ -1,0 +1,18 @@
+{
+    "source": "https://github.com/github/markup",
+    "fetchedAt": "2026-10-16",
+    "variables": {
+        "--base-size-16": "1rem",
+        "--base-size-24": "1.5rem",
+        "--base-size-4": ".25rem",
+        "--base-size-40": "2.5rem",
+        "--base-size-8": ".5rem",
+        "--base-text-weight-medium": "500",
+        "--base-text-weight-normal": "400",
+        "--base-text-weight-semibold": "600",
+        "--borderRadius-medium": ".375rem",
+        "--fontStack-monospace": "ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace",
+        "--fontStack-sansSerif": "\"Mona Sans VF\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", \"Noto Sans Backtick Fix\", \"Noto Sans\", Helvetica, Arial, sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\"",
+        "--fgColor-accent": "Highlight"
+    }
+}
