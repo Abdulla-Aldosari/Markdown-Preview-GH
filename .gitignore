@@ -1,7 +1,8 @@
 node_modules
 .vscode/settings.json
-.mindstream/
+.devdeck/
 .cline/
+.mindstream/
 .vsenv/
 dist/
 *.vsix
