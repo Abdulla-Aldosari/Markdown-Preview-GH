@@ -224,9 +224,13 @@
     "markdown-it": "12.3.2",
     "postcss": "8.5.30",
     "prettier": "^3.9.10",
+    "type-fest": "^5.10.0",
     "typescript": "^7.0.2"
   },
   "lint-staged": {
     "*.{js,mjs,cjs,ts,mts,cts,json,css,md}": "prettier --write"
+  },
+  "dependencies": {
+    "mermaid": "11.16.1"
   }
 }

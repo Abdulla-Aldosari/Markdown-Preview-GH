@@ -76,7 +76,7 @@ Per-file preferences are remembered across sessions for that file, without affec
 - **Open in Browser** - exports the rendered document, with all of its GitHub styling, as a standalone HTML page and opens it in your default browser.
 - **Print...** - does the same and opens the browser's print dialog automatically, so you can print the document or save it as PDF.
 
-Both commands are available directly from the preview context menu and from the Command Palette while a Markdown file is active. Exported pages always use GitHub's light theme, and relative images are resolved against the Markdown file's folder. The generated page is stored in the extension's global storage folder, so nothing is written into your project. These commands are not available in VS Code for the Web.
+Both commands are available directly from the preview context menu and from the Command Palette while a Markdown file is active. Exported pages always use GitHub's light theme, and relative images are resolved against the Markdown file's folder. Mermaid diagrams are rendered into the export as static SVG, so they appear in the exported page and in printed/PDF output without needing JavaScript. The generated page is stored in the extension's global storage folder, so nothing is written into your project.
 
 ![Print example](images/readme/print-example.png)
 

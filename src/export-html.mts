@@ -23,6 +23,9 @@ export function escapeHtml(value: string): string {
     return value.replace(/[&<>"']/g, (char) => htmlEscapes[char]);
 }
 
+/** The theme a standalone page is pinned to. */
+export type ThemeMode = 'light' | 'dark';
+
 /**
  * Matches the opening tag of the root container emitted by the preview
  * renderer. Only this element carries the theme attributes, so only it is
@@ -31,12 +34,11 @@ export function escapeHtml(value: string): string {
 const rootOpenTag = /^\s*<div\s+class="mpgh-body"[^>]*>/;
 
 /**
- * Pins the exported document to the light theme regardless of the user's
- * preview settings, since exported pages are mainly meant to be printed and
- * the light theme is the readable, ink-friendly choice.
+ * Pins the exported document to the given theme regardless of the user's
+ * preview settings, so the page carries a single, explicit theme.
  */
-export function forceLightTheme(bodyHtml: string): string {
-    return bodyHtml.replace(rootOpenTag, (tag) => tag.replace(/data-theme-mode="[^"]*"/, 'data-theme-mode="light"'));
+export function forceTheme(bodyHtml: string, mode: ThemeMode): string {
+    return bodyHtml.replace(rootOpenTag, (tag) => tag.replace(/data-theme-mode="[^"]*"/, `data-theme-mode="${mode}"`));
 }
 
 /**
@@ -105,9 +107,11 @@ export interface StandaloneHtmlOptions {
     css: string;
     baseHref?: string;
     autoPrint?: boolean;
+    /** The theme the page is pinned to. Defaults to `light`. */
+    theme?: ThemeMode;
 }
 
-export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint = false }: StandaloneHtmlOptions): string {
+export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint = false, theme = 'light' }: StandaloneHtmlOptions): string {
     const baseTag = baseHref ? `<base href="${escapeHtml(baseHref)}">` : '';
     const printScript = autoPrint ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
     return `<!DOCTYPE html>
@@ -115,19 +119,102 @@ export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint 
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="color-scheme" content="light">
+        <meta name="color-scheme" content="${theme}">
         <title>${escapeHtml(title)}</title>
         ${baseTag}
         <style>
 ${sanitizeInlineCss(css)}
         </style>
     </head>
-    <body class="vscode-body vscode-light">
+    <body class="vscode-body vscode-${theme}">
         <div class="markdown-body" dir="auto">
-            ${forceLightTheme(bodyHtml)}
+            ${forceTheme(bodyHtml, theme)}
         </div>
         ${printScript}
     </body>
 </html>
 `;
+}
+
+/**
+ * Matches the opening tag of a Mermaid placeholder the preview renderer
+ * emits: a `pre.mermaid` code fence or a `div.mermaid` custom container.
+ */
+const mermaidBlockTag = /<(pre|div)\s[^>]*class="[^"]*\bmermaid\b[^"]*"[^>]*>/g;
+
+/** The inline style that strips all code-block styling from a Mermaid fence. */
+const mermaidUnsetStyle = /\s+style="all:\s*unset;"/;
+
+export interface PreparedMermaidBody {
+    html: string;
+    /** True when the document contains at least one Mermaid placeholder. */
+    hasMermaid: boolean;
+}
+
+/**
+ * Normalizes the Mermaid placeholders of a rendered document before export.
+ * The `style="all: unset;"` the preview emits on `pre.mermaid` would leave a
+ * fence as bare, unstyled text; removing it lets the regular code-block
+ * styles apply, which is also the graceful fallback when a diagram fails to
+ * render.
+ */
+export function prepareMermaidHtml(bodyHtml: string): PreparedMermaidBody {
+    let hasMermaid = false;
+    const html = bodyHtml.replace(mermaidBlockTag, (tag) => {
+        hasMermaid = true;
+        return tag.startsWith('<pre') ? tag.replace(mermaidUnsetStyle, '') : tag;
+    });
+    return { html, hasMermaid };
+}
+
+export interface RendererPageOptions {
+    /** The rendered document body, before its diagrams are baked in. */
+    bodyHtml: string;
+    /** The theme the renderer page (and the export) is pinned to. */
+    theme: ThemeMode;
+    /** Webview URI of the bundled renderer script. */
+    scriptUri: string;
+    /** The webview CSP source, used to allow the local renderer script. */
+    cspSource: string;
+}
+
+/**
+ * Builds the HTML of the hidden webview page that renders the Mermaid
+ * diagrams at export time. The page loads the bundled renderer script from
+ * the extension itself; nothing from this page ships with the export.
+ */
+export function buildRendererPageHtml({ bodyHtml, theme, scriptUri, cspSource }: RendererPageOptions): string {
+    return `<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource}; style-src ${cspSource} 'unsafe-inline';">
+    </head>
+    <body class="vscode-body vscode-${theme}">
+        ${forceTheme(bodyHtml, theme)}
+        <script src="${escapeHtml(scriptUri)}"></script>
+    </body>
+</html>
+`;
+}
+
+/** The message the renderer script sends back with the finished body. */
+export interface RendererCompleteMessage {
+    bodyHtml: string;
+}
+
+/**
+ * Validates a message received from the hidden renderer webview. Returns the
+ * completed body HTML, or `undefined` when the payload is not the expected
+ * message.
+ */
+export function parseRendererMessage(message: unknown): RendererCompleteMessage | undefined {
+    if (!message || typeof message !== 'object') {
+        return undefined;
+    }
+    const record = message as Record<string, unknown>;
+    if (record.type !== 'mpgh-mermaid-render' || typeof record.bodyHtml !== 'string' || record.bodyHtml.length === 0) {
+        return undefined;
+    }
+    return { bodyHtml: record.bodyHtml };
 }

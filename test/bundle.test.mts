@@ -65,6 +65,43 @@ test('the preview script bundle is a classic script without module syntax', asyn
     assert.match(code, /vscode\.markdown\.updateContent/);
 });
 
+test('the Mermaid renderer bundle is a classic script carrying the renderer logic', async () => {
+    const code = (await buildInMemory(false)).get('mermaid-render.js');
+    assert.ok(code);
+    assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
+    // The IIFE closes before the combined legal comment block esbuild appends
+    // for the bundled third-party libraries.
+    assert.match(code, /\}\)\(\);\n/);
+    assert.doesNotMatch(code, /^\s*(import|export)\s/m);
+    assert.match(code, /mpgh-mermaid-render/, 'the host message type must survive bundling');
+    assert.match(code, /pre\.mermaid, div\.mermaid/, 'the placeholder selector must survive bundling');
+});
+
+test('the Mermaid renderer bundle executes in a browser-like sandbox without require', async () => {
+    const code = (await buildInMemory(false)).get('mermaid-render.js');
+    assert.ok(code);
+    const document = {
+        currentScript: null,
+        readyState: 'complete',
+        documentElement: { style: { setProperty: () => {} } },
+        body: { classList: { contains: () => false } },
+        addEventListener: () => {},
+        querySelectorAll: () => [],
+        querySelector: () => null,
+        createElement: () => ({ style: {}, remove: () => {} }),
+    };
+    const window: { addEventListener: () => void; matchMedia: () => { matches: boolean }; window?: unknown } = {
+        addEventListener: () => {},
+        matchMedia: () => ({ matches: false }),
+    };
+    window.window = window;
+    const sandbox = { document, window, console };
+    // The bundle may contain dead Node-detection code (UMD shims), but no
+    // executed path may touch `require`: the sandbox provides none, so a
+    // stray call would throw and fail this test.
+    vm.runInNewContext(code, sandbox);
+});
+
 test('copyStaticStylesheets copies every hand-written stylesheet byte for byte', () => {
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-styles-'));
     try {

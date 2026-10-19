@@ -14,6 +14,10 @@
  *   because the web extension host cannot load any other module.
  * - `dist/mermaid-theme-sync.js`: the preview script, a classic script (IIFE)
  *   injected into the preview webview.
+ * - `dist/mermaid-render.js`: the export renderer (with the whole Mermaid
+ *   library bundled in), a classic script (IIFE) loaded by the hidden
+ *   renderer webview the export command opens. It never ships with the
+ *   exported page.
  *
  * Usage:
  *   node ./build/bundle.mts [--production] [--watch]
@@ -60,6 +64,13 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
             ...shared,
             entryPoints: [path.join(rootDir, 'src', 'preview', 'mermaid-theme-sync.mts')],
             outfile: path.join(outDir, 'mermaid-theme-sync.js'),
+            format: 'iife',
+            platform: 'browser',
+        },
+        {
+            ...shared,
+            entryPoints: [path.join(rootDir, 'src', 'preview', 'mermaid-render.mts')],
+            outfile: path.join(outDir, 'mermaid-render.js'),
             format: 'iife',
             platform: 'browser',
         },

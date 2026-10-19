@@ -6,8 +6,8 @@ Markdown Preview GH restyles VS Code's built-in Markdown preview to match
 GitHub's rendering: GitHub's own CSS for typography, spacing, tables, and
 code blocks, plus GitHub-Flavored Markdown behaviors (alerts, task lists,
 emoji shortcodes) and RTL support. It also adds per-file layout preferences,
-export/print commands, and keeps Mermaid diagrams in sync with the preview
-theme.
+export/print commands (baking Mermaid diagrams into the exported page as
+static SVG), and keeps Mermaid diagrams in sync with the preview theme.
 
 The extension hooks into the built-in preview through three contribution
 points in `package.json`:
@@ -115,7 +115,13 @@ The extension entry point, bundled into `dist/extension.js` (`main` and
   every contributed stylesheet listed in the installed `package.json`
   (`readPreviewStyles`), build a standalone HTML page, store it under the
   extension's global storage, and open it in the default browser
-  (`Open in Browser`) or with the print dialog (`Print...`).
+  (`Open in Browser`) or with the print dialog (`Print...`). Documents
+  containing Mermaid placeholders are first processed by
+  `renderMermaidInHiddenWebview`, which opens a temporary hidden webview
+  (`createWebviewPanel`), loads `dist/mermaid-render.js` into it, receives
+  the finished body (diagrams baked in as static SVG) back through
+  `postMessage` with a 10-second timeout, and disposes the panel. The
+  exported page therefore ships no script and no Mermaid library.
 
 ### markdown-plugin.mts
 
@@ -161,13 +167,24 @@ emoji character, consumed by the inline rule in `markdown-plugin.mts`.
 
 Pure helpers for the standalone export page:
 
-- `forceLightTheme(bodyHtml)` - rewrites the root wrapper's
-  `data-theme-mode` to `light` and leaves the rest of the document (user
-  content) untouched.
+- `forceTheme(bodyHtml, mode)` - rewrites the root wrapper's
+  `data-theme-mode` to the given `ThemeMode` (`light`/`dark`) and leaves the
+  rest of the document (user content) untouched. Exports are pinned to
+  `light` today; the pipeline already accepts both modes.
 - `buildStandaloneHtml(options)` - assembles the complete page: escaped
   title, optional `<base href>`, the inline stylesheet (sanitized against
-  closing the `<style>` element), the `markdown-body` wrapper, and an
-  optional auto-print script.
+  closing the `<style>` element), the theme-pinned `markdown-body` wrapper,
+  the matching `color-scheme` meta and body class, and an optional
+  auto-print script.
+- `prepareMermaidHtml(bodyHtml)` - normalizes the Mermaid placeholders
+  (`pre.mermaid` / `div.mermaid`) of a rendered document: strips the
+  `style="all: unset;"` fences carry (so an unrendered fence falls back to a
+  normal code block) and reports whether the document contains any diagrams.
+- `buildRendererPageHtml(options)` - builds the HTML of the hidden webview
+  page the export command uses to render diagrams: the theme-pinned body,
+  the renderer script URI, and a CSP allowing only that local script.
+- `parseRendererMessage(message)` - validates the `postMessage` payload the
+  renderer sends back with the finished body HTML.
 - `exportFileName(sourceKey, displayName)` - stable, safe file name per
   source document (FNV-1a hash suffix), so repeated exports overwrite each
   other.
@@ -198,6 +215,29 @@ theme `palettes` (CSS variable values for light/dark),
 `resolveTargetBrightness({ mode, hostIsDark })`, and
 `readThemeState(dataset, environment)` which maps the container's
 `data-theme-mode` attribute onto that input.
+
+### preview/mermaid-render.mts
+
+The export renderer script, bundled by the build (with the whole Mermaid
+library) into the classic script (IIFE) `dist/mermaid-render.js`. It runs
+only inside the temporary hidden webview the export command opens; it never
+ships with the exported page. It reads the pinned `data-theme-mode` from the
+`.mpgh-body` wrapper, applies the matching palette as CSS variables on the
+document root, initializes Mermaid with the mapped `themeVariables`, replaces
+every `pre.mermaid` / `div.mermaid` placeholder with its rendered SVG (leaving
+failed diagrams as code blocks), and posts the finished body HTML back to the
+extension host through `acquireVsCodeApi().postMessage`.
+
+### preview/mermaid-render-logic.mts
+
+The pure decision logic of the export renderer, with no DOM access:
+`rendererMessageType` (the `postMessage` protocol constant),
+`resolveExportBrightness(mode, prefersDark)` (pinned modes win, anything
+else follows the color scheme), `buildMermaidThemeVariables(brightness)`
+(the Mermaid `themeVariables` derived from the shared `palettes` through the
+same fallback chains the live preview uses), and
+`buildMermaidConfig(brightness)` (`startOnLoad: false`, `theme: 'base'`,
+`securityLevel: 'strict'`).
 
 ## CSS layer
 
@@ -330,6 +370,9 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   the same file runs in the desktop and the web extension host.
 - `dist/mermaid-theme-sync.js` - the preview script as an IIFE classic
   script.
+- `dist/mermaid-render.js` - the export renderer (with the whole Mermaid
+  library bundled in) as an IIFE classic script, loaded only by the hidden
+  webview the export command opens.
 
 `createBuildOptions({ production, outDir })` returns the esbuild
 configurations and `copyStaticStylesheets(outDir)` copies the stylesheets;
@@ -368,10 +411,14 @@ for Markdown files (desktop only).
 One test file per module, all run with `npm test`:
 
 - `test/color-mode.test.mts` - per-file mode resolution.
-- `test/export-html.test.mts` - `forceLightTheme`, `buildStandaloneHtml`,
+- `test/export-html.test.mts` - `forceTheme`, `prepareMermaidHtml`,
+  `buildStandaloneHtml`, `buildRendererPageHtml`, `parseRendererMessage`,
   `exportFileName`, `toLocalFileUri`, HTML escaping.
 - `test/mermaid-theme-logic.test.mts` - the pure logic of the preview
   script.
+- `test/mermaid-render-logic.test.mts` - the pure logic of the export
+  renderer: brightness resolution plus lock tests for the exact
+  `themeVariables` mapping of both themes.
 - `test/markdown-plugin.test.mts` - the GFM plugin (task lists, alerts,
   emoji, code direction, the render wrapper) against a real Markdown-it
   instance, with the render options injected.
@@ -386,8 +433,10 @@ One test file per module, all run with `npm test`:
   silently shrink.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the extension bundle requires
-  only `vscode` and exports `activate`, the preview script is a classic
-  script, and the stylesheets are copied unchanged.
+  only `vscode` and exports `activate`, the preview script and the Mermaid
+  renderer are classic scripts, the renderer bundle executes end-to-end in a
+  `require`-less browser-like sandbox, and the stylesheets are copied
+  unchanged.
 
 ## Workflows
 
