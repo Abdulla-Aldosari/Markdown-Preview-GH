@@ -6,7 +6,7 @@
 
 <h1 align="center">Markdown Preview GH</h1>
 
-Brings GitHub's native rendering style and behavior directly into VS Code's built-in Markdown preview, so you can see exactly how your Markdown will look once it's pushed to GitHub.
+Your everyday Markdown preview, styled exactly like GitHub. Full GFM support, GitHub's light and dark themes, Mermaid diagrams, RTL support, and more — right inside VS Code.
 
 ![Markdown Preview GH example](images/readme/main-screen.png)
 
