@@ -25,6 +25,10 @@
     "gfm",
     "theme"
   ],
+  "galleryBanner": {
+    "color": "#121314",
+    "theme": "dark"
+  },
   "activationEvents": [],
   "main": "dist/extension.js",
   "browser": "dist/extension.js",
