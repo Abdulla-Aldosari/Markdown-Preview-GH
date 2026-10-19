@@ -225,8 +225,10 @@ ships with the exported page. It reads the pinned `data-theme-mode` from the
 `.mpgh-body` wrapper, applies the matching palette as CSS variables on the
 document root, initializes Mermaid with the mapped `themeVariables`, replaces
 every `pre.mermaid` / `div.mermaid` placeholder with its rendered SVG (leaving
-failed diagrams as code blocks), and posts the finished body HTML back to the
-extension host through `acquireVsCodeApi().postMessage`.
+failed diagrams as code blocks), centers each baked SVG with
+`display: block; margin: 0 auto` (the export has no preview wrapper to center
+it), and posts the finished body HTML back to the extension host through
+`acquireVsCodeApi().postMessage`.
 
 ### preview/mermaid-render-logic.mts
 

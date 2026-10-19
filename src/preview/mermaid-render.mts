@@ -72,7 +72,16 @@ async function renderDiagrams(): Promise<void> {
             const { svg } = await mermaid.render(`mpgh-mermaid-${index}`, source);
             const template = document.createElement('template');
             template.innerHTML = svg;
-            block.replaceWith(template.content.firstElementChild ?? template.content);
+            const diagram = template.content.firstElementChild;
+            // Mermaid sizes the SVG with width="100%" and a natural-size
+            // max-width. The live preview centers it through its own
+            // translated wrapper; the exported page has no such wrapper, so
+            // the diagram is centered directly with block layout.
+            if (diagram instanceof SVGElement) {
+                diagram.style.display = 'block';
+                diagram.style.margin = '0 auto';
+            }
+            block.replaceWith(diagram ?? template.content);
         } catch {
             // Keep the placeholder as a styled code block fallback.
         }
