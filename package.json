@@ -2,7 +2,7 @@
   "name": "markdown-preview-gh",
   "displayName": "Markdown Preview GH",
   "description": "Brings GitHub's own styling and rendering details to VS Code's built-in Markdown preview.",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "publisher": "Abdulla-Aldosari",
   "license": "MIT",
   "icon": "images/logo256.png",
