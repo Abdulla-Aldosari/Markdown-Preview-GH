@@ -121,31 +121,55 @@ export interface StandaloneHtmlOptions {
     autoPrint?: boolean;
     /** The theme the page is pinned to. Defaults to `light`. */
     theme?: ThemeMode;
+    /**
+     * The inline Mermaid bundle baked into the page. Included only for
+     * documents with diagrams; the page then shows a themed waiting overlay
+     * until the diagrams are rendered.
+     */
+    mermaidScript?: string;
 }
 
-export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint = false, theme = 'light' }: StandaloneHtmlOptions): string {
+/**
+ * Builds the print stylesheet addition that repaints the page with the light
+ * theme: the light theme's variables, extracted from the contributed CSS, are
+ * reapplied to the dark selectors inside a `@media print` block, so printing
+ * a dark page always produces light output while the screen stays untouched.
+ */
+export function buildPrintLightThemeCss(css: string): string {
+    const declarations: string[] = [];
+    const blockPattern = /\[data-theme-mode=light\][^{]*\{([\s\S]*?)\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = blockPattern.exec(css)) !== null) {
+        for (const declaration of match[1].match(/--[\w-]+\s*:[^;]+;?/g) ?? []) {
+            declarations.push(`    ${declaration.trim().replace(/;$/, '')};`);
+        }
+    }
+    if (declarations.length === 0) {
+        return '';
+    }
+    return `\n@media print {\n    html[data-theme-mode='dark'],\n    body.vscode-dark,\n    body.vscode-high-contrast {\n        color-scheme: light;\n${declarations.join('\n')}\n    }\n}\n`;
+}
+
+/** The stylesheet the page carries only when diagrams must be rendered. */
+function mermaidExportCss(): string {
+    return `\n        /* Waiting overlay shown until the diagrams are rendered. */\n        .mpgh-export-wait {\n            position: fixed;\n            inset: 0;\n            display: flex;\n            flex-direction: column;\n            align-items: center;\n            justify-content: center;\n            gap: 16px;\n            background-color: var(--bgColor-default);\n            z-index: 1000;\n        }\n\n        .mpgh-export-wait-spinner {\n            width: 48px;\n            height: 48px;\n            border: 4px solid var(--borderColor-default);\n            border-top-color: var(--fgColor-accent);\n            border-radius: 50%;\n            animation: mpgh-export-spin 0.8s linear infinite;\n        }\n\n        @keyframes mpgh-export-spin {\n            to {\n                transform: rotate(360deg);\n            }\n        }\n\n        .mpgh-export-wait-text {\n            margin: 0;\n            color: var(--fgColor-muted);\n            font-family: system-ui, sans-serif;\n            font-size: 14px;\n        }\n\n        /* Dark pages carry a light copy of every diagram for printing. */\n        .mpgh-export-diagram,\n        .mpgh-export-diagram-screen,\n        .mpgh-export-diagram-print {\n            display: block;\n        }\n\n        .mpgh-export-diagram-print {\n            display: none;\n        }\n\n        @media print {\n            .mpgh-export-diagram-screen {\n                display: none !important;\n            }\n\n            .mpgh-export-diagram-print {\n                display: block;\n            }\n        }\n`;
+}
+
+/** The waiting overlay markup, removed by the bundle once rendering ends. */
+function mermaidWaitingOverlayHtml(): string {
+    return `<div class="mpgh-export-wait">\n            <div class="mpgh-export-wait-spinner"></div>\n            <p class="mpgh-export-wait-text">Please Wait&hellip;</p>\n        </div>`;
+}
+
+/** The inline scripts the page carries when it must render diagrams. */
+function mermaidExportHtml(autoPrint: boolean, mermaidScript: string): string {
+    return `${mermaidWaitingOverlayHtml()}\n        <script>window.MPGH_EXPORT = { print: ${autoPrint ? 'true' : 'false'} };</script>\n        <script>\n${mermaidScript}\n        </script>`;
+}
+
+export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint = false, theme = 'light', mermaidScript }: StandaloneHtmlOptions): string {
     const baseTag = baseHref ? `<base href="${escapeHtml(baseHref)}">` : '';
-    const printScript = autoPrint ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
-    return `<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="color-scheme" content="${theme}">
-        <title>${escapeHtml(title)}</title>
-        ${baseTag}
-        <style>
-${sanitizeInlineCss(css)}
-        </style>
-    </head>
-    <body class="vscode-body vscode-${theme}">
-        <div class="markdown-body" dir="auto">
-            ${forceTheme(bodyHtml, theme)}
-        </div>
-        ${printScript}
-    </body>
-</html>
-`;
+    const printScript = autoPrint && !mermaidScript ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
+    const mermaidHtml = mermaidScript ? mermaidExportHtml(autoPrint, mermaidScript) : '';
+    return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        ${baseTag}\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n${mermaidScript ? mermaidExportCss() : ''}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
 }
 
 /**
@@ -177,56 +201,4 @@ export function prepareMermaidHtml(bodyHtml: string): PreparedMermaidBody {
         return tag.startsWith('<pre') ? tag.replace(mermaidUnsetStyle, '') : tag;
     });
     return { html, hasMermaid };
-}
-
-export interface RendererPageOptions {
-    /** The rendered document body, before its diagrams are baked in. */
-    bodyHtml: string;
-    /** The theme the renderer page (and the export) is pinned to. */
-    theme: ThemeMode;
-    /** Webview URI of the bundled renderer script. */
-    scriptUri: string;
-    /** The webview CSP source, used to allow the local renderer script. */
-    cspSource: string;
-}
-
-/**
- * Builds the HTML of the hidden webview page that renders the Mermaid
- * diagrams at export time. The page loads the bundled renderer script from
- * the extension itself; nothing from this page ships with the export.
- */
-export function buildRendererPageHtml({ bodyHtml, theme, scriptUri, cspSource }: RendererPageOptions): string {
-    return `<!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${cspSource}; style-src ${cspSource} 'unsafe-inline';">
-    </head>
-    <body class="vscode-body vscode-${theme}">
-        ${forceTheme(bodyHtml, theme)}
-        <script src="${escapeHtml(scriptUri)}"></script>
-    </body>
-</html>
-`;
-}
-
-/** The message the renderer script sends back with the finished body. */
-export interface RendererCompleteMessage {
-    bodyHtml: string;
-}
-
-/**
- * Validates a message received from the hidden renderer webview. Returns the
- * completed body HTML, or `undefined` when the payload is not the expected
- * message.
- */
-export function parseRendererMessage(message: unknown): RendererCompleteMessage | undefined {
-    if (!message || typeof message !== 'object') {
-        return undefined;
-    }
-    const record = message as Record<string, unknown>;
-    if (record.type !== 'mpgh-mermaid-render' || typeof record.bodyHtml !== 'string' || record.bodyHtml.length === 0) {
-        return undefined;
-    }
-    return { bodyHtml: record.bodyHtml };
 }
