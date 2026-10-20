@@ -225,14 +225,17 @@
     "sync:themes": "node ./build/sync-themes.mts",
     "audit:themes": "node ./build/theme-audit/audit.mts",
     "test": "node --test \"test/**/*.test.mts\"",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@playwright/test": "^1.64.1",
     "@types/markdown-it": "12.2.3",
     "@types/node": "^22.5.5",
     "@types/vscode": "1.106.0",
+    "@vscode/test-electron": "^3.1.0",
     "esbuild": "^0.28.2",
     "git-cliff": "^2.14.2",
     "husky": "^9.1.7",
