@@ -20,10 +20,10 @@
  * - `dist/mermaid-preview-vendor.js`: the whole Mermaid library as a classic
  *   script (IIFE) exposing `window.MermaidVendor`. Loaded on demand by the
  *   preview script, only when diagrams exist.
- * - `dist/mermaid-render.js`: the export renderer (with the whole Mermaid
- *   library bundled in), a classic script (IIFE) loaded by the hidden
- *   renderer webview the export command opens. It never ships with the
- *   exported page.
+ * - `dist/mermaid-export.js`: the whole Mermaid library and the standalone
+ *   ZenUML bundle compiled into one classic script (IIFE). The export
+ *   command bakes it inline into the exported page, which renders its
+ *   diagrams inside the browser it was opened in.
  *
  * Usage:
  *   node ./build/bundle.mts [--production] [--watch]
@@ -82,8 +82,8 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
         },
         {
             ...shared,
-            entryPoints: [path.join(rootDir, 'src', 'preview', 'mermaid-render.mts')],
-            outfile: path.join(outDir, 'mermaid-render.js'),
+            entryPoints: [path.join(rootDir, 'src', 'preview', 'mermaid-export.mts')],
+            outfile: path.join(outDir, 'mermaid-export.js'),
             format: 'iife',
             platform: 'browser',
         },
