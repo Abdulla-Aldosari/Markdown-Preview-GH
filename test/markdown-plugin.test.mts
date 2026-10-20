@@ -7,7 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import MarkdownIt from 'markdown-it';
-import { createGfmPlugin, type RenderOptions } from '../src/markdown-plugin.mts';
+import { createGfmPlugin, reclassifyMermaidPlaceholders, type RenderOptions } from '../src/markdown-plugin.mts';
 
 const defaultOptions: RenderOptions = { direction: 'ltr', width: 'normal', themeMode: 'auto' };
 
@@ -152,4 +152,18 @@ test('code blocks always render left to right without block dir attributes', () 
     const html = md.render('para\n\n```js\nx\n```\n\n    indented\n');
     assert.match(html, /<p>para<\/p>/, 'block dir attributes are dropped');
     assert.equal(html.match(/<pre dir="ltr">/g)?.length, 2);
+});
+
+test('reclassifyMermaidPlaceholders renames the built-in diagram containers and keeps the source', () => {
+    assert.equal(reclassifyMermaidPlaceholders('<pre class="mermaid" style="all: unset;">code</pre>'), '<pre class="mpgh-mermaid" data-mpgh-mermaid-source="code">code</pre>');
+    assert.equal(
+        reclassifyMermaidPlaceholders('<pre dir="ltr" class="mermaid" style="all: unset;">A --&gt; B</pre>'),
+        '<pre dir="ltr" class="mpgh-mermaid" data-mpgh-mermaid-source="A --> B">A --&gt; B</pre>'
+    );
+    assert.equal(reclassifyMermaidPlaceholders('<div class="mermaid">code</div>'), '<div class="mpgh-mermaid" data-mpgh-mermaid-source="code">code</div>');
+});
+
+test('reclassifyMermaidPlaceholders leaves other code blocks untouched', () => {
+    const html = '<pre class="language-js"><code>x</code></pre><div class="mermaid2">y</div>';
+    assert.equal(reclassifyMermaidPlaceholders(html), html);
 });

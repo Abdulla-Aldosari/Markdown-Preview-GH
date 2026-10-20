@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as esbuild from 'esbuild';
-import { STATIC_STYLESHEETS, copyStaticStylesheets, createBuildOptions } from '../build/bundle.mts';
+import { STATIC_STYLESHEETS, copyMermaidLibrary, copyStaticStylesheets, createBuildOptions } from '../build/bundle.mts';
 
 /**
  * Builds every runtime bundle in memory and returns the output text keyed
@@ -55,14 +55,30 @@ test('the extension bundle exports activate when loaded with a vscode stand-in',
     assert.equal(typeof module.exports.activate, 'function');
 });
 
-test('the preview script bundle is a classic script without module syntax', async () => {
-    const code = (await buildInMemory(false)).get('mermaid-theme-sync.js');
+test('the preview script bundle is a small classic script without the Mermaid library', async () => {
+    const code = (await buildInMemory(false)).get('mermaid-preview.js');
     assert.ok(code);
     assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
-    assert.match(code, /\n\}\)\(\);\n$/);
-    assert.deepEqual(requiredModules(code), []);
+    assert.match(code, /\n\}\)\(\);\n/);
     assert.doesNotMatch(code, /^\s*(import|export)\s/m);
     assert.match(code, /vscode\.markdown\.updateContent/);
+    // The heavy library must not be bundled here: it is loaded lazily from
+    // the vendor bundle so the preview content never waits for it.
+    assert.ok(code.length < 50_000, 'the preview script must stay small');
+});
+
+test('copyMermaidLibrary publishes the official ESM entry with its chunks', async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-mermaid-copy-'));
+    try {
+        copyMermaidLibrary(outDir);
+        const entry = fs.readFileSync(path.join(outDir, 'mermaid', 'mermaid.esm.mjs'), 'utf8');
+        assert.ok(entry.includes('mermaid_default as default'), 'the ESM entry must be copied');
+        const chunks = fs.readdirSync(path.join(outDir, 'mermaid', 'chunks'), { recursive: true }).filter((name) => typeof name === 'string' && name.endsWith('.mjs'));
+        assert.ok(chunks.length > 10, 'the diagram chunks must be copied');
+        assert.ok(chunks.length > 10, 'the diagram chunks must be copied');
+    } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+    }
 });
 
 test('the Mermaid renderer bundle is a classic script carrying the renderer logic', async () => {
@@ -113,4 +129,13 @@ test('copyStaticStylesheets copies every hand-written stylesheet byte for byte',
     } finally {
         fs.rmSync(outDir, { recursive: true, force: true });
     }
+});
+
+test('the ZenUML bundle is a self-contained ES module registering the diagram', async () => {
+    const code = (await buildInMemory(false)).get('zenuml.js');
+    assert.ok(code);
+    assert.match(code, /registerExternalDiagrams/, 'the zenuml diagram must be registered');
+    assert.match(code, /export\s*\{/, 'the bundle must be an ES module');
+    // The bundle carries its own copy of the whole Mermaid library.
+    assert.ok(code.length > 1_000_000, 'the zenuml bundle must carry the library');
 });

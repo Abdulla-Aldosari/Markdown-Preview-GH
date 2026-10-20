@@ -8,6 +8,7 @@ import {
     forceTheme,
     parseRendererMessage,
     prepareMermaidHtml,
+    resolveExportThemeMode,
     toLocalFileUri,
 } from '../src/export-html.mts';
 
@@ -77,6 +78,19 @@ test('forceTheme pins only the root container to the dark theme', () => {
 test('forceTheme leaves unexpected markup untouched', () => {
     const html = '<p data-theme-mode="dark">x</p>';
     assert.equal(forceTheme(html, 'dark'), html);
+});
+
+test('resolveExportThemeMode maps pinned modes directly', () => {
+    assert.equal(resolveExportThemeMode('light', true), 'light');
+    assert.equal(resolveExportThemeMode('light', false), 'light');
+    assert.equal(resolveExportThemeMode('dark', true), 'dark');
+    assert.equal(resolveExportThemeMode('dark', false), 'dark');
+});
+
+test('resolveExportThemeMode follows the host for any other mode', () => {
+    assert.equal(resolveExportThemeMode('auto', true), 'dark');
+    assert.equal(resolveExportThemeMode('auto', false), 'light');
+    assert.equal(resolveExportThemeMode('', false), 'light');
 });
 
 const mermaidBody = `<div class="mpgh-body" dir="ltr" data-theme-mode="auto">
