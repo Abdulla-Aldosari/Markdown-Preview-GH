@@ -15,13 +15,20 @@
  * JavaScript at all.
  *
  * The pure decision logic lives in `mermaid-render-logic.mts` and
- * `mermaid-diagram-theme.mts`. The build bundles this file (with the whole
- * mermaid library) into a classic script.
+ * `mermaid-diagram-theme.mts`. The build keeps this file small: it loads
+ * the mermaid library lazily from `dist/mermaid` (the official ESM
+ * distribution with its on-demand chunks), because bundling the whole
+ * library into one script crashes the webview with a V8 out-of-memory.
  */
 
-import mermaid from 'mermaid';
+import type { MermaidConfig } from 'mermaid';
 import { injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { buildMermaidConfig, rendererMessageType, resolveExportBrightness } from './mermaid-render-logic.mts';
+
+interface MermaidApi {
+    initialize(config: MermaidConfig): void;
+    render(id: string, source: string): Promise<{ svg: string }>;
+}
 
 interface RendererVscodeApi {
     postMessage(message: unknown): void;
@@ -31,6 +38,15 @@ declare function acquireVsCodeApi(): RendererVscodeApi;
 
 /** Captured synchronously: only valid during the script's own evaluation. */
 const ownScript = document.currentScript;
+
+function loadMermaid(): Promise<MermaidApi> {
+    return import(new URL('mermaid/mermaid.esm.mjs', ownScript?.getAttribute('src') ?? document.baseURI).href).then((module: { default?: MermaidApi }) => {
+        if (!module.default) {
+            throw new Error('The Mermaid library did not load.');
+        }
+        return module.default;
+    });
+}
 
 function prefersDarkColorScheme(): boolean {
     return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -54,8 +70,9 @@ function targetBrightness(): 'light' | 'dark' {
  * page.
  */
 async function renderDiagrams(): Promise<void> {
+    const api = await loadMermaid();
     const brightness = targetBrightness();
-    mermaid.initialize(buildMermaidConfig(brightness));
+    api.initialize(buildMermaidConfig(brightness));
     const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid, div.mermaid'));
     for (let index = 0; index < blocks.length; index++) {
         const block = blocks[index];
@@ -67,7 +84,7 @@ async function renderDiagrams(): Promise<void> {
             if (!source) {
                 continue;
             }
-            const { svg } = await mermaid.render(`mpgh-mermaid-${index}`, injectThemeDirective(source, brightness));
+            const { svg } = await api.render(`mpgh-mermaid-${index}`, injectThemeDirective(source, brightness));
             const template = document.createElement('template');
             template.innerHTML = svg;
             const diagram = template.content.firstElementChild;

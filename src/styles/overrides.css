@@ -231,3 +231,24 @@ body,
         display: none !important;
     }
 }
+/*
+ * The treeView diagram ships no colors of its own (the renderer draws plain
+ * text and lines), so it falls back to the default black. Paint it with the
+ * same colors the mermaid.js.org website uses for this diagram type.
+ */
+body.vscode-dark .treeView-node-label,
+body.vscode-high-contrast .treeView-node-label {
+    fill: rgb(204, 204, 204) !important;
+}
+body.vscode-dark .treeView-node-line,
+body.vscode-high-contrast .treeView-node-line {
+    stroke: rgb(211, 211, 211) !important;
+}
+body.vscode-light .treeView-node-label,
+body.vscode-high-contrast-light .treeView-node-label {
+    fill: rgb(51, 51, 51) !important;
+}
+body.vscode-light .treeView-node-line,
+body.vscode-high-contrast-light .treeView-node-line {
+    stroke: rgb(51, 51, 51) !important;
+}

@@ -77,6 +77,46 @@ const alertMarker = new RegExp(`^\\[!(${Object.keys(alertTypes).join('|')})\\]`,
  * Creates the Markdown-it plugin that installs Markdown Preview GH
  * extensions.
  */
+/**
+ * Reclassifies the Mermaid placeholders the built-in diagram extension
+ * emits, so its webview renderer never finds them: `class="mermaid"` becomes
+ * `mpgh-mermaid` (the class this extension's own preview script renders),
+ * and the `style="all: unset;"` fences carry is dropped so an unrendered
+ * diagram falls back to a normally styled code block.
+ *
+ * The original diagram source travels as `data-mpgh-mermaid-source`, because
+ * once the preview script has rendered a diagram, the block contains SVG
+ * markup and the source is gone from the DOM.
+ */
+export function reclassifyMermaidPlaceholders(html: string): string {
+    return html
+        .replace(/<pre([^>]*)class="mermaid"([^>]*)>([\s\S]*?)<\/pre>/g, (match, before, after, body) => {
+            const source = decodeHtmlEntities(body);
+            const attributes = after.replace(/\s*style="all:\s*unset\s*;?"?/, '');
+            return `<pre${before}class="mpgh-mermaid"${attributes} data-mpgh-mermaid-source="${escapeHtmlAttribute(source)}">${body}</pre>`;
+        })
+        .replace(/<div class="mermaid">([\s\S]*?)<\/div>/g, (match, body) => {
+            const source = decodeHtmlEntities(body);
+            return `<div class="mpgh-mermaid" data-mpgh-mermaid-source="${escapeHtmlAttribute(source)}">${body}</div>`;
+        });
+}
+
+/** Decodes the HTML entities Markdown-it escapes into fence bodies. */
+function decodeHtmlEntities(text: string): string {
+    return text
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&amp;/g, '&');
+}
+
+/** Escapes a source string so it can travel inside an HTML attribute. */
+function escapeHtmlAttribute(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 export function createGfmPlugin(getRenderOptions: RenderOptionsProvider): (markdownIt: MarkdownIt) => void {
     return (markdownIt) => installGfmExtensions(markdownIt, getRenderOptions);
 }
@@ -223,8 +263,9 @@ function installGfmExtensions(markdownIt: MarkdownIt, getRenderOptions: RenderOp
         const { direction, width, themeMode } = getRenderOptions(resource);
         currentRenderDirection = direction;
         const context = markdownIt.utils.escapeHtml(JSON.stringify({ resource }));
+        const html = reclassifyMermaidPlaceholders(render.apply(markdownIt.renderer, args));
         return `<div class="mpgh-body" dir="${direction}" data-vscode-context='${context}' data-theme-mode="${themeMode}">
-                    <div class="mpgh-content" data-content-width="${width}">${render.apply(markdownIt.renderer, args)}</div>
+                    <div class="mpgh-content" data-content-width="${width}">${html}</div>
                 </div>`;
     };
 }

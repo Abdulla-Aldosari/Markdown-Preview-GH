@@ -27,6 +27,18 @@ export function escapeHtml(value: string): string {
 export type ThemeMode = 'light' | 'dark';
 
 /**
+ * Resolves the theme an exported page must be pinned to: `light` and `dark`
+ * imply their theme directly; anything else follows the host color theme,
+ * so the export matches what the preview currently shows.
+ */
+export function resolveExportThemeMode(mode: string, hostIsDark: boolean): ThemeMode {
+    if (mode === 'light' || mode === 'dark') {
+        return mode;
+    }
+    return hostIsDark ? 'dark' : 'light';
+}
+
+/**
  * Matches the opening tag of the root container emitted by the preview
  * renderer. Only this element carries the theme attributes, so only it is
  * rewritten - user-authored HTML further down the document is left intact.

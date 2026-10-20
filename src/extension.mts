@@ -14,7 +14,16 @@
 import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
 import { resolveColorMode, validColorModes } from './color-mode.mts';
-import { buildRendererPageHtml, buildStandaloneHtml, exportFileName, parseRendererMessage, prepareMermaidHtml, toLocalFileUri } from './export-html.mts';
+import {
+    buildRendererPageHtml,
+    buildStandaloneHtml,
+    exportFileName,
+    parseRendererMessage,
+    prepareMermaidHtml,
+    resolveExportThemeMode,
+    toLocalFileUri,
+    type ThemeMode,
+} from './export-html.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
@@ -593,7 +602,7 @@ const mermaidRenderTimeoutMs = 10_000;
  * webview cannot deliver a result in time, the prepared body (diagrams as
  * plain code blocks) is returned instead.
  */
-async function renderMermaidInHiddenWebview(ctx: vscode.ExtensionContext, bodyHtml: string): Promise<string> {
+async function renderMermaidInHiddenWebview(ctx: vscode.ExtensionContext, bodyHtml: string, theme: ThemeMode): Promise<string> {
     return new Promise<string>((resolve) => {
         let settled = false;
         let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -623,11 +632,21 @@ async function renderMermaidInHiddenWebview(ctx: vscode.ExtensionContext, bodyHt
         panel.onDidDispose(() => finish(bodyHtml));
         panel.webview.html = buildRendererPageHtml({
             bodyHtml,
-            theme: 'light',
+            theme,
             scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, 'dist', 'mermaid-render.js')).toString(),
             cspSource: panel.webview.cspSource,
         });
     });
+}
+
+/**
+ * Resolves the theme the exported page must carry: the preview's active
+ * theme mode, with `auto` following the editor's light/dark color theme.
+ */
+function exportTheme(resource: string): ThemeMode {
+    const mode = getRenderOptions(resource).themeMode;
+    const hostIsDark = vscode.window.activeColorTheme.kind !== vscode.ColorThemeKind.Light;
+    return resolveExportThemeMode(mode, hostIsDark);
 }
 
 /**
@@ -652,12 +671,13 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         if (typeof bodyHtml !== 'string') {
             throw new Error('The Markdown renderer did not return any HTML.');
         }
+        const theme = exportTheme(uri.toString());
         const prepared = prepareMermaidHtml(bodyHtml);
-        const finalBodyHtml = prepared.hasMermaid ? await renderMermaidInHiddenWebview(ctx, prepared.html) : prepared.html;
+        const finalBodyHtml = prepared.hasMermaid ? await renderMermaidInHiddenWebview(ctx, prepared.html, theme) : prepared.html;
         const css = await readPreviewStyles(ctx);
         const displayName = uri.path.split('/').pop() || 'document';
         const baseHref = uri.scheme === 'file' ? `${vscode.Uri.joinPath(uri, '..').toString()}/` : undefined;
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: finalBodyHtml, css, baseHref, autoPrint });
+        const html = buildStandaloneHtml({ title: displayName, bodyHtml: finalBodyHtml, css, baseHref, autoPrint, theme });
 
         await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
         const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
