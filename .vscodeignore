@@ -5,10 +5,15 @@ node_modules/
 .cline/
 .husky/
 .vsenv/
+.vscode-test/
 test/
 src/
 build/
 docs/*.md
+e2e/
+playwright.config.ts
+test-results/
+playwright-report/
 .gitignore
 .prettierignore
 commitlint.config.js

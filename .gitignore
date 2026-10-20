@@ -4,6 +4,9 @@ node_modules
 .cline/
 .mindstream/
 .vsenv/
+.vscode-test/
 dist/
 *.vsix
 build/theme-audit/manual-surface.html
+test-results/
+playwright-report/
