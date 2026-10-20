@@ -20,9 +20,6 @@
 import { siteThemes, type Brightness } from './mermaid-theme-logic.mts';
 import type { MermaidConfig } from 'mermaid';
 
-/** Message type the renderer script sends back to the extension host. */
-export const rendererMessageType = 'mpgh-mermaid-render';
-
 /**
  * Decides which theme the exported diagrams must use. `light` and `dark`
  * imply their theme directly; anything else follows the color scheme of the

@@ -6,75 +6,48 @@
  *-------------------------------------------------*/
 
 /**
- * Renders the Mermaid placeholders of an exported document into finished SVG
- * diagrams and reports the completed body HTML back to the extension host.
+ * Renders the Mermaid placeholders of an exported page directly inside the
+ * browser the page was opened in, so the export command never needs a
+ * temporary webview in VS Code. The whole library (Mermaid and the standalone
+ * ZenUML bundle) is compiled into this single classic script, which the
+ * export bakes inline into the page. Nothing here ships separately.
  *
- * This script only ever runs inside a hidden, temporary webview the export
- * command opens. It never ships with the exported page: the export bakes the
- * returned static SVG markup into the file, so the final page needs no
- * JavaScript at all.
+ * Each diagram is rendered with the website theme for its type, injected into
+ * its source exactly like the live preview does. In addition, when the page
+ * is pinned to the dark theme, every diagram is rendered a second time with
+ * the light theme; the page shows the dark copy on screen and the light copy
+ * is revealed only by the print stylesheet, so printing a dark page produces
+ * light diagrams.
  *
  * The pure decision logic lives in `mermaid-render-logic.mts` and
- * `mermaid-diagram-theme.mts`. The build keeps this file small: it loads
- * the mermaid library lazily from `dist/mermaid` (the official ESM
- * distribution with its on-demand chunks), because bundling the whole
- * library into one script crashes the webview with a V8 out-of-memory.
+ * `mermaid-diagram-theme.mts`.
  */
 
 import type { MermaidConfig } from 'mermaid';
+import mermaid from 'mermaid';
+import zenumlPlugin from '@mermaid-js/mermaid-zenuml';
 import { detectDiagramType, injectThemeDirective } from './mermaid-diagram-theme.mts';
-import { buildMermaidConfig, rendererMessageType, resolveExportBrightness } from './mermaid-render-logic.mts';
+import { buildMermaidConfig, resolveExportBrightness } from './mermaid-render-logic.mts';
 
 interface MermaidApi {
     initialize(config: MermaidConfig): void;
     render(id: string, source: string): Promise<{ svg: string }>;
 }
 
-interface RendererVscodeApi {
-    postMessage(message: unknown): void;
+interface ExportPageOptions {
+    /** The export command was invoked as `Print...`, so print once rendered. */
+    print: boolean;
 }
 
-declare function acquireVsCodeApi(): RendererVscodeApi;
-
-/** Captured synchronously: only valid during the script's own evaluation. */
-const ownScript = document.currentScript;
+declare global {
+    interface Window {
+        MPGH_EXPORT?: ExportPageOptions;
+    }
+}
 
 /** Sources of the zenuml diagram type, which Mermaid itself lacks. */
 function isZenumlSource(raw: string): boolean {
     return detectDiagramType(raw) === 'zenuml';
-}
-
-let zenumlLoad: Promise<MermaidApi> | null = null;
-
-/**
- * Loads the standalone ZenUML bundle, only when the document actually
- * contains a zenuml block: it carries a second copy of the whole Mermaid
- * library, so it must never load for documents without one.
- */
-function loadZenumlApi(): Promise<MermaidApi> {
-    if (zenumlLoad) {
-        return zenumlLoad;
-    }
-    const attempt = import(new URL('zenuml.js', ownScript?.getAttribute('src') ?? document.baseURI).href).then((module: { default?: MermaidApi }) => {
-        if (!module.default) {
-            throw new Error('The ZenUML bundle did not expose the library.');
-        }
-        return module.default;
-    });
-    zenumlLoad = attempt.catch((error: unknown) => {
-        zenumlLoad = null;
-        throw error;
-    });
-    return zenumlLoad;
-}
-
-function loadMermaid(): Promise<MermaidApi> {
-    return import(new URL('mermaid/mermaid.esm.mjs', ownScript?.getAttribute('src') ?? document.baseURI).href).then((module: { default?: MermaidApi }) => {
-        if (!module.default) {
-            throw new Error('The Mermaid library did not load.');
-        }
-        return module.default;
-    });
 }
 
 function prefersDarkColorScheme(): boolean {
@@ -91,82 +64,102 @@ function targetBrightness(): 'light' | 'dark' {
     return resolveExportBrightness(mode, prefersDarkColorScheme());
 }
 
+/** The raw diagram source of a placeholder block. */
+function rawSource(block: HTMLElement): string {
+    return (block.dataset.mpghMermaidSource ?? block.textContent ?? '').trim();
+}
+
 /**
- * Replaces every mermaid placeholder with its rendered SVG. Each diagram is
- * rendered with the website theme for its type, injected into its source
- * exactly like the live preview does. A diagram that fails to render is
- * left as-is, so it degrades to a plain code block instead of breaking the
- * page.
+ * Renders a diagram with the given engine and returns the finished SVG as a
+ * centered, block-level element, or `undefined` when the render fails.
+ */
+async function renderDiagram(api: MermaidApi, id: string, source: string): Promise<Element | undefined> {
+    const { svg } = await api.render(id, source);
+    const template = document.createElement('template');
+    template.innerHTML = svg;
+    const diagram = template.content.firstElementChild;
+    if (diagram instanceof SVGElement) {
+        diagram.style.display = 'block';
+        diagram.style.margin = '0 auto';
+    }
+    return diagram ?? undefined;
+}
+
+/**
+ * Replaces every Mermaid placeholder with its rendered SVG. Each diagram is
+ * rendered with the website theme for its type; a diagram that fails to
+ * render is left as-is, so it degrades to a plain code block instead of
+ * breaking the page.
  */
 async function renderDiagrams(): Promise<void> {
-    const api = await loadMermaid();
     const brightness = targetBrightness();
-    api.initialize(buildMermaidConfig(brightness));
-    // The preview plugin reclassifies its placeholders to mpgh-mermaid,
-    // so the export renderer matches both classes.
+    // The zenuml package is a diagram plugin, not a standalone engine:
+    // register it on the bundled Mermaid so zenuml renders through the same
+    // API as every other diagram type.
+    mermaid.registerExternalDiagrams([zenumlPlugin], { lazyLoad: false });
+    mermaid.initialize(buildMermaidConfig(brightness));
+    // The preview plugin reclassifies its placeholders to mpgh-mermaid, so
+    // the export renderer matches both classes.
     const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid, div.mermaid, pre.mpgh-mermaid, div.mpgh-mermaid'));
-    const needsZenuml = blocks.some((block) => isZenumlSource((block.dataset.mpghMermaidSource ?? block.textContent ?? '').trim()));
-    const zenumlApi = needsZenuml ? await loadZenumlApi() : null;
-    if (zenumlApi) {
-        zenumlApi.initialize(buildMermaidConfig(brightness));
-    }
     for (let index = 0; index < blocks.length; index++) {
         const block = blocks[index];
         if (!block.isConnected) {
             continue;
         }
         try {
-            const raw = (block.dataset.mpghMermaidSource ?? block.textContent ?? '').trim();
+            const raw = rawSource(block);
             if (!raw) {
                 continue;
             }
             const useZenuml = isZenumlSource(raw);
             const source = useZenuml ? raw : injectThemeDirective(raw, brightness);
-            const { svg } = await (useZenuml && zenumlApi ? zenumlApi : api).render(`mpgh-mermaid-${index}`, source);
-            const template = document.createElement('template');
-            template.innerHTML = svg;
-            const diagram = template.content.firstElementChild;
-            // Mermaid sizes the SVG with width="100%" and a natural-size
-            // max-width. The live preview centers it through its own
-            // translated wrapper; the exported page has no such wrapper, so
-            // the diagram is centered directly with block layout.
-            if (diagram instanceof SVGElement) {
-                diagram.style.display = 'block';
-                diagram.style.margin = '0 auto';
+            const screenDiagram = await renderDiagram(mermaid, `mpgh-export-${index}-screen`, source);
+            if (!screenDiagram) {
+                continue;
             }
-            block.replaceWith(diagram ?? template.content);
+            // A light page needs no second copy: the same diagram serves both
+            // screen and print.
+            if (brightness === 'light') {
+                block.replaceWith(screenDiagram);
+                continue;
+            }
+            const printDiagram = await renderDiagram(mermaid, `mpgh-export-${index}-print`, useZenuml ? raw : injectThemeDirective(raw, 'light'));
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mpgh-export-diagram';
+            const screenSlot = document.createElement('div');
+            screenSlot.className = 'mpgh-export-diagram-screen';
+            screenSlot.append(screenDiagram);
+            wrapper.append(screenSlot);
+            if (printDiagram) {
+                const printSlot = document.createElement('div');
+                printSlot.className = 'mpgh-export-diagram-print';
+                printSlot.append(printDiagram);
+                wrapper.append(printSlot);
+            }
+            block.replaceWith(wrapper);
         } catch {
             // Keep the placeholder as a styled code block fallback.
         }
     }
 }
 
-/**
- * Serializes the document content the host must bake into the export: the
- * `.mpgh-body` wrapper, now carrying finished SVGs.
- */
-function finishedBodyHtml(): string {
-    const wrapper = document.querySelector('.mpgh-body');
-    if (wrapper) {
-        return wrapper.outerHTML;
-    }
-    ownScript?.remove();
-    return document.body.innerHTML;
+/** Removes the waiting overlay the page shows while the diagrams render. */
+function finishWaitingOverlay(): void {
+    document.querySelector('.mpgh-export-wait')?.remove();
 }
 
-async function run(): Promise<void> {
+async function main(): Promise<void> {
     try {
         await renderDiagrams();
     } catch {
-        // Report whatever is available; the host falls back to the prepared
-        // (unrendered) body when the message cannot be validated.
+        // A fatal error still reveals the prepared page as code blocks.
+    } finally {
+        finishWaitingOverlay();
     }
-    const api = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : undefined;
-    api?.postMessage({ type: rendererMessageType, bodyHtml: finishedBodyHtml() });
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => void run(), { once: true });
-} else {
-    void run();
-}
+void main().then(() => {
+    if (window.MPGH_EXPORT?.print) {
+        window.print();
+    }
+});
