@@ -14,16 +14,7 @@
 import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
 import { resolveColorMode, validColorModes } from './color-mode.mts';
-import {
-    buildRendererPageHtml,
-    buildStandaloneHtml,
-    exportFileName,
-    parseRendererMessage,
-    prepareMermaidHtml,
-    resolveExportThemeMode,
-    toLocalFileUri,
-    type ThemeMode,
-} from './export-html.mts';
+import { buildStandaloneHtml, exportFileName, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
@@ -592,51 +583,14 @@ async function readPreviewStyles(ctx: vscode.ExtensionContext): Promise<string> 
     return contents.join('\n');
 }
 
-/** How long the export waits for the hidden renderer webview to answer. */
-const mermaidRenderTimeoutMs = 10_000;
-
 /**
- * Renders the Mermaid diagrams of a rendered document body inside a hidden,
- * temporary webview (the only place with a real text-layout engine at export
- * time), and returns the body with the finished SVGs baked in. When the
- * webview cannot deliver a result in time, the prepared body (diagrams as
- * plain code blocks) is returned instead.
+ * Reads the inline Mermaid bundle the exported page needs to render its
+ * diagrams in the browser, so the export command never opens a temporary
+ * webview in VS Code.
  */
-async function renderMermaidInHiddenWebview(ctx: vscode.ExtensionContext, bodyHtml: string, theme: ThemeMode): Promise<string> {
-    return new Promise<string>((resolve) => {
-        let settled = false;
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        let panel: vscode.WebviewPanel;
-        try {
-            panel = vscode.window.createWebviewPanel(
-                'markdown-preview-gh.mermaidRenderer',
-                'Markdown Preview GH: Rendering diagrams…',
-                { viewColumn: vscode.ViewColumn.Active, preserveFocus: true },
-                { enableScripts: true }
-            );
-        } catch {
-            resolve(bodyHtml);
-            return;
-        }
-        const finish = (html: string): void => {
-            if (settled) {
-                return;
-            }
-            settled = true;
-            clearTimeout(timeout);
-            panel.dispose();
-            resolve(html);
-        };
-        timeout = setTimeout(() => finish(bodyHtml), mermaidRenderTimeoutMs);
-        panel.webview.onDidReceiveMessage((message) => finish(parseRendererMessage(message)?.bodyHtml ?? bodyHtml), undefined, ctx.subscriptions);
-        panel.onDidDispose(() => finish(bodyHtml));
-        panel.webview.html = buildRendererPageHtml({
-            bodyHtml,
-            theme,
-            scriptUri: panel.webview.asWebviewUri(vscode.Uri.joinPath(ctx.extensionUri, 'dist', 'mermaid-render.js')).toString(),
-            cspSource: panel.webview.cspSource,
-        });
-    });
+async function readMermaidExportBundle(ctx: vscode.ExtensionContext): Promise<string> {
+    const bytes = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(ctx.extensionUri, 'dist', 'mermaid-export.js'));
+    return new TextDecoder('utf-8').decode(bytes);
 }
 
 /**
@@ -673,11 +627,11 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         }
         const theme = exportTheme(uri.toString());
         const prepared = prepareMermaidHtml(bodyHtml);
-        const finalBodyHtml = prepared.hasMermaid ? await renderMermaidInHiddenWebview(ctx, prepared.html, theme) : prepared.html;
+        const mermaidScript = prepared.hasMermaid ? await readMermaidExportBundle(ctx) : undefined;
         const css = await readPreviewStyles(ctx);
         const displayName = uri.path.split('/').pop() || 'document';
         const baseHref = uri.scheme === 'file' ? `${vscode.Uri.joinPath(uri, '..').toString()}/` : undefined;
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: finalBodyHtml, css, baseHref, autoPrint, theme });
+        const html = buildStandaloneHtml({ title: displayName, bodyHtml: prepared.html, css, baseHref, autoPrint, theme, mermaidScript });
 
         await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
         const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
