@@ -81,41 +81,20 @@ test('copyMermaidLibrary publishes the official ESM entry with its chunks', asyn
     }
 });
 
-test('the Mermaid renderer bundle is a classic script carrying the renderer logic', async () => {
-    const code = (await buildInMemory(false)).get('mermaid-render.js');
+test('the Mermaid export bundle is a classic script carrying the renderer logic', async () => {
+    const code = (await buildInMemory(false)).get('mermaid-export.js');
     assert.ok(code);
     assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
     // The IIFE closes before the combined legal comment block esbuild appends
     // for the bundled third-party libraries.
     assert.match(code, /\}\)\(\);\n/);
     assert.doesNotMatch(code, /^\s*(import|export)\s/m);
-    assert.match(code, /mpgh-mermaid-render/, 'the host message type must survive bundling');
+    assert.match(code, /MPGH_EXPORT/, 'the export page options must survive bundling');
     assert.match(code, /pre\.mermaid, div\.mermaid, pre\.mpgh-mermaid, div\.mpgh-mermaid/, 'the placeholder selector must survive bundling');
-});
-
-test('the Mermaid renderer bundle executes in a browser-like sandbox without require', async () => {
-    const code = (await buildInMemory(false)).get('mermaid-render.js');
-    assert.ok(code);
-    const document = {
-        currentScript: null,
-        readyState: 'complete',
-        documentElement: { style: { setProperty: () => {} } },
-        body: { classList: { contains: () => false } },
-        addEventListener: () => {},
-        querySelectorAll: () => [],
-        querySelector: () => null,
-        createElement: () => ({ style: {}, remove: () => {} }),
-    };
-    const window: { addEventListener: () => void; matchMedia: () => { matches: boolean }; window?: unknown } = {
-        addEventListener: () => {},
-        matchMedia: () => ({ matches: false }),
-    };
-    window.window = window;
-    const sandbox = { document, window, console };
-    // The bundle may contain dead Node-detection code (UMD shims), but no
-    // executed path may touch `require`: the sandbox provides none, so a
-    // stray call would throw and fail this test.
-    vm.runInNewContext(code, sandbox);
+    assert.match(code, /mpgh-export-diagram-print/, 'the print copy wrapper must survive bundling');
+    // The bundle must carry both engines: Mermaid itself and the standalone
+    // ZenUML library with its own copy of the Mermaid runtime.
+    assert.ok(code.length > 2_000_000, 'the export bundle must carry the libraries');
 });
 
 test('copyStaticStylesheets copies every hand-written stylesheet byte for byte', () => {

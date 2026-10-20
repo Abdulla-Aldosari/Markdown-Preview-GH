@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    buildRendererPageHtml,
+    buildPrintLightThemeCss,
     buildStandaloneHtml,
     escapeHtml,
     exportFileName,
     forceTheme,
-    parseRendererMessage,
     prepareMermaidHtml,
     resolveExportThemeMode,
     toLocalFileUri,
@@ -139,36 +138,66 @@ test('buildStandaloneHtml pins a dark export to the dark theme end to end', () =
     assert.match(html, /<p data-theme-mode="dark">/, 'user content must not be rewritten');
 });
 
-test('buildRendererPageHtml hosts the pinned body and loads only the local renderer', () => {
-    const html = buildRendererPageHtml({
+test('buildPrintLightThemeCss repaints dark selectors with the light variables for print', () => {
+    const css = `
+[data-theme-mode=light],
+.vscode-body.vscode-light [data-theme-mode=auto] {
+    color-scheme: light;
+    --fgColor-danger: #d1242f;
+    --bgColor-muted: #f6f8fa;
+}
+[data-theme-mode=dark],
+.vscode-body.vscode-dark [data-theme-mode=auto] {
+    color-scheme: dark;
+    --fgColor-danger: #ff7b72;
+    --bgColor-muted: #21262d;
+}`;
+    const print = buildPrintLightThemeCss(css);
+    assert.match(print, /@media print/);
+    assert.match(print, /html\[data-theme-mode='dark'\]/);
+    assert.match(print, /body\.vscode-dark/);
+    assert.match(print, /body\.vscode-high-contrast/);
+    assert.match(print, /--fgColor-danger: #d1242f;/);
+    assert.match(print, /--bgColor-muted: #f6f8fa;/);
+    assert.match(print, /color-scheme: light;/);
+    assert.doesNotMatch(print, /#ff7b72/, 'dark values must not leak into the print block');
+});
+
+test('buildPrintLightThemeCss returns nothing when no light block exists', () => {
+    assert.equal(buildPrintLightThemeCss('body { color: red; }'), '');
+});
+
+test('buildPrintLightThemeCss also extracts minified single-line light blocks', () => {
+    const print = buildPrintLightThemeCss('[data-theme-mode=light] { --bgColor-default: #ffffff; --fgColor-default: #1f2328; }');
+    assert.match(print, /--bgColor-default: #ffffff;/);
+    assert.match(print, /--fgColor-default: #1f2328;/);
+});
+
+test('buildStandaloneHtml with diagrams embeds the bundle, the overlay and the themed body background', () => {
+    const html = buildStandaloneHtml({
+        title: 't',
         bodyHtml: mermaidBody,
-        theme: 'light',
-        scriptUri: 'vscode-webview://abc&x/dist/mermaid-render.js',
-        cspSource: 'vscode-webview://abc&x',
+        css: '',
+        theme: 'dark',
+        autoPrint: true,
+        mermaidScript: '/* mermaid bundle */',
     });
-    assert.match(html, /^<!DOCTYPE html>/);
-    assert.match(
-        html,
-        /<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src vscode-webview:\/\/abc&x; style-src vscode-webview:\/\/abc&x 'unsafe-inline';">/
-    );
-    assert.match(html, /<body class="vscode-body vscode-light">/);
-    assert.match(html, /class="mpgh-body"[^>]*data-theme-mode="light"/);
-    assert.match(html, /<script src="vscode-webview:\/\/abc&amp;x\/dist\/mermaid-render\.js"><\/script>/);
+    assert.match(html, /class="mpgh-export-wait"/);
+    assert.match(html, /mpgh-export-wait-spinner/);
+    assert.match(html, /Please Wait&hellip;/);
+    assert.match(html, /window\.MPGH_EXPORT = \{ print: true \}/);
+    assert.match(html, /<script>\n\/\* mermaid bundle \*\//);
+    assert.match(html, /body \{\n\s*background-color: var\(--bgColor-default\);\n\s*\}/);
+    assert.match(html, /\.mpgh-export-diagram-print \{\s*display: none;/);
+    assert.doesNotMatch(html, /window\.addEventListener\('load'/, 'the bundle handles printing itself');
 });
 
-test('parseRendererMessage accepts a valid completed body', () => {
-    const message = { type: 'mpgh-mermaid-render', bodyHtml: '<div class="mpgh-body"></div>' };
-    assert.deepEqual(parseRendererMessage(message), { bodyHtml: '<div class="mpgh-body"></div>' });
-});
-
-test('parseRendererMessage rejects foreign or malformed payloads', () => {
-    assert.equal(parseRendererMessage(undefined), undefined);
-    assert.equal(parseRendererMessage(null), undefined);
-    assert.equal(parseRendererMessage('mpgh-mermaid-render'), undefined);
-    assert.equal(parseRendererMessage({ type: 'other', bodyHtml: 'x' }), undefined);
-    assert.equal(parseRendererMessage({ type: 'mpgh-mermaid-render' }), undefined);
-    assert.equal(parseRendererMessage({ type: 'mpgh-mermaid-render', bodyHtml: 42 }), undefined);
-    assert.equal(parseRendererMessage({ type: 'mpgh-mermaid-render', bodyHtml: '' }), undefined);
+test('buildStandaloneHtml without diagrams stays a plain page with no overlay', () => {
+    const html = buildStandaloneHtml({ title: 't', bodyHtml: renderedBody, css: '', autoPrint: true });
+    assert.doesNotMatch(html, /mpgh-export-wait/);
+    assert.doesNotMatch(html, /MPGH_EXPORT/);
+    assert.match(html, /window\.addEventListener\('load', \(\) => window\.print\(\)\)/);
+    assert.match(html, /background-color: var\(--bgColor-default\)/);
 });
 
 test("buildStandaloneHtml wraps the content in VS Code's own .markdown-body container", () => {
