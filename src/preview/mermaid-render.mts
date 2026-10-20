@@ -22,7 +22,7 @@
  */
 
 import type { MermaidConfig } from 'mermaid';
-import { injectThemeDirective } from './mermaid-diagram-theme.mts';
+import { detectDiagramType, injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { buildMermaidConfig, rendererMessageType, resolveExportBrightness } from './mermaid-render-logic.mts';
 
 interface MermaidApi {
@@ -38,6 +38,35 @@ declare function acquireVsCodeApi(): RendererVscodeApi;
 
 /** Captured synchronously: only valid during the script's own evaluation. */
 const ownScript = document.currentScript;
+
+/** Sources of the zenuml diagram type, which Mermaid itself lacks. */
+function isZenumlSource(raw: string): boolean {
+    return detectDiagramType(raw) === 'zenuml';
+}
+
+let zenumlLoad: Promise<MermaidApi> | null = null;
+
+/**
+ * Loads the standalone ZenUML bundle, only when the document actually
+ * contains a zenuml block: it carries a second copy of the whole Mermaid
+ * library, so it must never load for documents without one.
+ */
+function loadZenumlApi(): Promise<MermaidApi> {
+    if (zenumlLoad) {
+        return zenumlLoad;
+    }
+    const attempt = import(new URL('zenuml.js', ownScript?.getAttribute('src') ?? document.baseURI).href).then((module: { default?: MermaidApi }) => {
+        if (!module.default) {
+            throw new Error('The ZenUML bundle did not expose the library.');
+        }
+        return module.default;
+    });
+    zenumlLoad = attempt.catch((error: unknown) => {
+        zenumlLoad = null;
+        throw error;
+    });
+    return zenumlLoad;
+}
 
 function loadMermaid(): Promise<MermaidApi> {
     return import(new URL('mermaid/mermaid.esm.mjs', ownScript?.getAttribute('src') ?? document.baseURI).href).then((module: { default?: MermaidApi }) => {
@@ -73,18 +102,27 @@ async function renderDiagrams(): Promise<void> {
     const api = await loadMermaid();
     const brightness = targetBrightness();
     api.initialize(buildMermaidConfig(brightness));
-    const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid, div.mermaid'));
+    // The preview plugin reclassifies its placeholders to mpgh-mermaid,
+    // so the export renderer matches both classes.
+    const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid, div.mermaid, pre.mpgh-mermaid, div.mpgh-mermaid'));
+    const needsZenuml = blocks.some((block) => isZenumlSource((block.dataset.mpghMermaidSource ?? block.textContent ?? '').trim()));
+    const zenumlApi = needsZenuml ? await loadZenumlApi() : null;
+    if (zenumlApi) {
+        zenumlApi.initialize(buildMermaidConfig(brightness));
+    }
     for (let index = 0; index < blocks.length; index++) {
         const block = blocks[index];
         if (!block.isConnected) {
             continue;
         }
         try {
-            const source = (block.textContent ?? '').trim();
-            if (!source) {
+            const raw = (block.dataset.mpghMermaidSource ?? block.textContent ?? '').trim();
+            if (!raw) {
                 continue;
             }
-            const { svg } = await api.render(`mpgh-mermaid-${index}`, injectThemeDirective(source, brightness));
+            const useZenuml = isZenumlSource(raw);
+            const source = useZenuml ? raw : injectThemeDirective(raw, brightness);
+            const { svg } = await (useZenuml && zenumlApi ? zenumlApi : api).render(`mpgh-mermaid-${index}`, source);
             const template = document.createElement('template');
             template.innerHTML = svg;
             const diagram = template.content.firstElementChild;
