@@ -226,6 +226,9 @@ flicker unchanged diagrams. It:
   every update,
 - re-runs on the `vscode.markdown.updateContent` event and on DOM
   mutations, coalescing bursts through a scheduled single run,
+- persists finished SVGs to localStorage (capped by the pure
+  `selectLargestCacheEntries` selector) and restores them instantly when
+  VS Code rebuilds the webview after the preview tab was hidden,
 - honours an explicit `markdown.mermaid.*` theme choice (anything but
   `vscode`), which replaces the per-diagram injection entirely.
 
