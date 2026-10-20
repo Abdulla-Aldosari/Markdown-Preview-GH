@@ -201,3 +201,13 @@ test('exportFileName is stable per source and safe for the file system', () => {
     assert.match(exportFileName('x', `${nonLatinStem}.md`), new RegExp(`^${nonLatinStem}-[0-9a-f]{8}\\.html$`, 'u'));
     assert.match(exportFileName('x', '???.md'), /^document-[0-9a-f]{8}\.html$/);
 });
+test('prepareMermaidHtml detects the reclassified preview placeholders', () => {
+    const body = `<div class="mpgh-body">
+        <pre class="mpgh-mermaid" data-mpgh-mermaid-source="graph TD\n    A --&gt; B">graph TD\n    A --&gt; B</pre>
+        <div class="mpgh-mermaid">sequenceDiagram\n    A-&gt;&gt;B: hi</div>
+    </div>`;
+    const { html, hasMermaid } = prepareMermaidHtml(body);
+    assert.equal(hasMermaid, true);
+    assert.match(html, /<pre class="mpgh-mermaid" data-mpgh-mermaid-source=/);
+    assert.match(html, /<div class="mpgh-mermaid">sequenceDiagram/);
+});

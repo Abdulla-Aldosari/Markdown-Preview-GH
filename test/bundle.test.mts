@@ -90,7 +90,7 @@ test('the Mermaid renderer bundle is a classic script carrying the renderer logi
     assert.match(code, /\}\)\(\);\n/);
     assert.doesNotMatch(code, /^\s*(import|export)\s/m);
     assert.match(code, /mpgh-mermaid-render/, 'the host message type must survive bundling');
-    assert.match(code, /pre\.mermaid, div\.mermaid/, 'the placeholder selector must survive bundling');
+    assert.match(code, /pre\.mermaid, div\.mermaid, pre\.mpgh-mermaid, div\.mpgh-mermaid/, 'the placeholder selector must survive bundling');
 });
 
 test('the Mermaid renderer bundle executes in a browser-like sandbox without require', async () => {
