@@ -36,6 +36,27 @@ export function resolveExportBrightness(mode: string, prefersDark: boolean): Bri
 }
 
 /**
+ * Picks the cache entries the persistent store keeps: the largest ones
+ * first, while they fit under the byte limit, so the diagrams that are
+ * most expensive to redraw survive an eviction. A single entry larger
+ * than the limit is kept anyway when it is the only one.
+ */
+export function selectLargestCacheEntries(entries: ReadonlyArray<readonly [string, string]>, maxBytes: number): Array<readonly [string, string]> {
+    const sorted = [...entries].sort((a, b) => b[0].length + b[1].length - (a[0].length + a[1].length));
+    const kept: Array<readonly [string, string]> = [];
+    let bytes = 0;
+    for (const entry of sorted) {
+        const size = entry[0].length + entry[1].length;
+        if (bytes + size > maxBytes && kept.length > 0) {
+            break;
+        }
+        kept.push(entry);
+        bytes += size;
+    }
+    return kept;
+}
+
+/**
  * The mermaid configuration used by the export renderer: the real website
  * theme for the given brightness (`default` in light mode, `dark` in dark
  * mode), no auto-start, and strict sanitization of the produced SVG.

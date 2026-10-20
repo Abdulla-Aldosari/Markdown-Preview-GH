@@ -26,11 +26,21 @@
 import type { MermaidConfig } from 'mermaid';
 import { detectDiagramType, injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { readThemeState, resolvePreviewBrightness, type Brightness } from './mermaid-theme-logic.mts';
-import { buildMermaidConfig } from './mermaid-render-logic.mts';
+import { buildMermaidConfig, selectLargestCacheEntries } from './mermaid-render-logic.mts';
 
 const updateEvent = 'vscode.markdown.updateContent';
 const blockSelector = '.mpgh-mermaid';
 const renderTimeoutMs = 30_000;
+
+/**
+ * The persistent cache. VS Code destroys the webview when the preview tab
+ * is hidden and rebuilds it on return, which wipes the in-memory caches
+ * and re-renders every diagram. localStorage survives the rebuild (the
+ * webview origin stays the same), so finished SVGs are restored from it
+ * instantly instead of re-rendering.
+ */
+const storageKey = 'mpgh-mermaid-cache-v1';
+const maxPersistedBytes = 2_000_000;
 
 /** The part of the Mermaid API this script uses. */
 interface MermaidApi {
@@ -153,6 +163,39 @@ const svgCache = new Map<string, string>();
  * does not spin the render loop (or the CPU) forever.
  */
 const errorCache = new Map<string, string>();
+/** Whether new SVGs were cached since the last persist pass. */
+let cacheDirty = false;
+
+/** Restores finished SVGs the previous webview instance persisted. */
+function loadPersistedCache(): void {
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return;
+        }
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        for (const [key, value] of Object.entries(parsed)) {
+            if (typeof value === 'string') {
+                svgCache.set(key, value);
+            }
+        }
+    } catch {
+        // Missing, corrupt, or unavailable storage: start with an empty cache.
+    }
+}
+
+/**
+ * Persists the largest cached SVGs under the byte limit, so the diagrams
+ * that are most expensive to redraw survive the webview being rebuilt.
+ */
+function persistCache(): void {
+    try {
+        const kept = selectLargestCacheEntries([...svgCache.entries()], maxPersistedBytes);
+        localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(kept)));
+    } catch {
+        // Storage full or unavailable: the in-memory cache still works.
+    }
+}
 
 let initializedBrightness: Brightness | null = null;
 let initializedZenumlBrightness: Brightness | null = null;
@@ -200,6 +243,7 @@ async function renderBlock(api: MermaidApi, index: number, block: HTMLElement, s
     try {
         const { svg } = await Promise.race([api.render(svgId, source), timeout]);
         svgCache.set(cacheKey, svg);
+        cacheDirty = true;
         block.dataset.mpghCache = cacheKey;
         block.dataset.mpghRendered = '1';
         block.innerHTML = svg;
@@ -303,6 +347,10 @@ function scheduleRender(): void {
             // Leave the current diagrams (or code blocks) as they are.
             console.error('mpgh-mermaid: render cycle failed', error);
         } finally {
+            if (cacheDirty) {
+                cacheDirty = false;
+                persistCache();
+            }
             running = false;
             if (queued) {
                 queued = false;
@@ -340,6 +388,7 @@ function watchContent(): void {
     });
 }
 
+loadPersistedCache();
 watchContent();
 scheduleRender();
 if (document.readyState === 'loading') {
