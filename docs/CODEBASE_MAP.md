@@ -273,7 +273,10 @@ dependency is upgraded.
 
 The export renderer script, bundled by the build into a small classic
 script (IIFE) `dist/mermaid-render.js`. Like the preview script it loads
-the Mermaid library lazily from `dist/mermaid/` instead of bundling it. It runs
+the Mermaid library lazily from `dist/mermaid/` instead of bundling it,
+matches both `mermaid` and the reclassified `mpgh-mermaid` placeholders,
+reads each source from `data-mpgh-mermaid-source`, and loads the
+standalone zenuml bundle when the document contains zenuml. It runs
 only inside the temporary hidden webview the export command opens; it never
 ships with the exported page. It reads the pinned `data-theme-mode` from the
 `.mpgh-body` wrapper, initializes Mermaid with the fallback website theme
