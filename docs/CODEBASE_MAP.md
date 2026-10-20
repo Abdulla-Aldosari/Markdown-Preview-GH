@@ -7,7 +7,8 @@ GitHub's rendering: GitHub's own CSS for typography, spacing, tables, and
 code blocks, plus GitHub-Flavored Markdown behaviors (alerts, task lists,
 emoji shortcodes) and RTL support. It also adds per-file layout preferences,
 export/print commands (baking Mermaid diagrams into the exported page as
-static SVG), and keeps Mermaid diagrams in sync with the preview theme.
+static SVG), keeps Mermaid diagrams in sync with the preview theme, and
+renders them with the same themes the mermaid.js.org website uses.
 
 The extension hooks into the built-in preview through three contribution
 points in `package.json`:
@@ -43,6 +44,9 @@ in the workspace state takes priority over the global mode.
 - `test/` - unit tests (`*.test.mts`) for every runtime module, pipeline
   module, and the bundle output, run by the built-in `node:test` runner
   directly on the TypeScript sources.
+- `e2e/` - UI tests (`*.spec.ts`, `helpers.mts`, `fixtures/`) driven by
+  Playwright's Electron launcher against a real VS Code window
+  (`npm run test:e2e`); `playwright.config.ts` configures them.
 - `tsconfig.json` - type checking only (`noEmit`).
 - `docs/` - `CODEBASE_MAP.md` and local developer notes.
 - `images/` - marketplace and README assets.
@@ -194,27 +198,66 @@ Pure helpers for the standalone export page:
 ### preview/mermaid-theme-sync.mts
 
 The preview script, bundled by the build into the classic script (IIFE)
-`dist/mermaid-theme-sync.js` (`markdown.previewScripts`). It keeps Mermaid
-diagrams consistent with the preview theme. The built-in diagram renderer
-reads the host editor theme once, synchronously, at the start of a render;
-this script temporarily presents the host theme matching the preview theme
-for exactly that read and restores the original state before the browser can
-paint. It:
+`dist/mermaid-theme-sync.js` (`markdown.previewScripts`). It applies the
+mermaid themes of the mermaid.js.org website and keeps Mermaid diagrams
+consistent with the preview theme. Every diagram source gets a
+`%%{init}%%` theme directive for its type and the preview brightness,
+prepended before the built-in renderer reads it; a source that already
+defines a theme of its own, and a preview whose `markdown.mermaid.*`
+settings carry an explicit user theme, are left untouched. It:
 
-- wraps `window.dispatchEvent` so the override is in place while the
-  `vscode.markdown.updateContent` event listeners run,
-- watches the first (uninterceptable) render and requests a re-render with
-  the override when it starts with the wrong host theme,
+- injects the directives inside the wrapped `window.dispatchEvent` for
+  `vscode.markdown.updateContent`, so the sources are themed before any
+  renderer listener reads them,
+- stores the original source in `data-mpgh-mermaid-source` and re-injects
+  it for the current brightness on every render,
+- wraps `window.dispatchEvent` so the host-theme override is in place while
+  the event listeners run (the renderer picks between the light and dark
+  theme names from the host theme classes, which the preview theme can
+  disagree with),
+- watches the first (uninterceptable) render and requests a re-render when
+  it started with the original sources or the wrong host theme (the preview
+  content can arrive after this script evaluated, so the first render is
+  also redone whenever the sources it read carry no theme directive),
 - restores diagram sources before re-rendering, since the renderer empties
   the diagram elements when it starts.
 
 ### preview/mermaid-theme-logic.mts
 
 The pure decision logic of the preview script, with no DOM access: the host
-theme `palettes` (CSS variable values for light/dark),
-`resolveTargetBrightness({ mode, hostIsDark })`, and
-`readThemeState(dataset, environment)` which maps the container's
-`data-theme-mode` attribute onto that input.
+theme `palettes` (CSS variable values for light/dark, presented while the
+renderer reads the host theme), `siteThemes` (the website's fallback theme
+name per brightness: `default` / `dark`), `resolvePreviewBrightness({ mode,
+hostIsDark })` (the brightness the preview displays with), and
+`resolveTargetBrightness({ mode, hostIsDark })` / `readThemeState(dataset,
+environment)` which drive the host-theme override.
+
+### preview/mermaid-diagram-theme.mts
+
+The pure per-diagram theme logic shared by the live preview and the export
+renderer, with no DOM access: `detectDiagramType(source)` (the first
+keyword after an optional frontmatter block and leading directives),
+`selectDiagramTheme(diagramType, brightness)` (the classic `default` theme
+in light mode; `redux-dark-color` for the node-based types — flowchart,
+swimlane, class, er, requirement, sequence, state — and the classic `dark`
+theme for everything else in dark mode), `sourceDefinesTheme(source)`
+(whether a leading frontmatter config or directive already carries a
+theme), `buildThemeDirective(diagramType, brightness)` (the `%%{init}%%`
+directive carrying the theme name plus the pure theme variables of
+`mermaid-theme-palettes.mts`), and `injectThemeDirective(source,
+brightness)` which prepends the directive unless the source defines a theme
+of its own.
+
+### preview/mermaid-theme-palettes.mts
+
+Frozen snapshots of the pure `getThemeVariables({})` values of the three
+themes the diagrams use (`default`, `dark`, `redux-dark-color`), computed
+from the pinned mermaid version for exactly the keys the built-in renderer
+recolors with gray editor variables. Injecting them alongside the theme
+name neutralizes the gray variables, so the pure website theme reaches the
+diagram. Locked by `test/mermaid-theme-palettes.test.mts`; regenerated
+manually with a Node one-liner against the pinned mermaid package when the
+dependency is upgraded.
 
 ### preview/mermaid-render.mts
 
@@ -222,12 +265,13 @@ The export renderer script, bundled by the build (with the whole Mermaid
 library) into the classic script (IIFE) `dist/mermaid-render.js`. It runs
 only inside the temporary hidden webview the export command opens; it never
 ships with the exported page. It reads the pinned `data-theme-mode` from the
-`.mpgh-body` wrapper, applies the matching palette as CSS variables on the
-document root, initializes Mermaid with the mapped `themeVariables`, replaces
-every `pre.mermaid` / `div.mermaid` placeholder with its rendered SVG (leaving
-failed diagrams as code blocks), centers each baked SVG with
-`display: block; margin: 0 auto` (the export has no preview wrapper to center
-it), and posts the finished body HTML back to the extension host through
+`.mpgh-body` wrapper, initializes Mermaid with the fallback website theme
+for that brightness, injects the per-diagram theme directive into every
+`pre.mermaid` / `div.mermaid` placeholder exactly like the live preview
+does, replaces each placeholder with its rendered SVG (leaving failed
+diagrams as code blocks), centers each baked SVG with `display: block;
+margin: 0 auto` (the export has no preview wrapper to center it), and posts
+the finished body HTML back to the extension host through
 `acquireVsCodeApi().postMessage`.
 
 ### preview/mermaid-render-logic.mts
@@ -235,11 +279,10 @@ it), and posts the finished body HTML back to the extension host through
 The pure decision logic of the export renderer, with no DOM access:
 `rendererMessageType` (the `postMessage` protocol constant),
 `resolveExportBrightness(mode, prefersDark)` (pinned modes win, anything
-else follows the color scheme), `buildMermaidThemeVariables(brightness)`
-(the Mermaid `themeVariables` derived from the shared `palettes` through the
-same fallback chains the live preview uses), and
-`buildMermaidConfig(brightness)` (`startOnLoad: false`, `theme: 'base'`,
-`securityLevel: 'strict'`).
+else follows the color scheme), and `buildMermaidConfig(brightness)` (the
+fallback configuration for sources the per-diagram injection leaves alone:
+`startOnLoad: false`, `theme: 'default'` in light mode / `'dark'` in dark
+mode, `securityLevel: 'strict'`).
 
 ## CSS layer
 
@@ -446,9 +489,14 @@ One test file per module, all run with `npm test`:
   existence check, and the command itself.
 - `test/mermaid-theme-logic.test.mts` - the pure logic of the preview
   script.
+- `test/mermaid-diagram-theme.test.mts` - diagram type detection, the
+  theme selection per brightness, the directive builder, and the injection
+  with its user-config exemptions.
+- `test/mermaid-theme-palettes.test.mts` - the frozen pure theme variable
+  snapshots and their key coverage.
 - `test/mermaid-render-logic.test.mts` - the pure logic of the export
-  renderer: brightness resolution plus lock tests for the exact
-  `themeVariables` mapping of both themes.
+  renderer: brightness resolution and lock tests for the fallback config
+  of both brightnesses.
 - `test/markdown-plugin.test.mts` - the GFM plugin (task lists, alerts,
   emoji, code direction, the render wrapper) against a real Markdown-it
   instance, with the render options injected.
@@ -467,6 +515,10 @@ One test file per module, all run with `npm test`:
   renderer are classic scripts, the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.
+- `e2e/mermaid-themes.spec.ts` - UI tests (`npm run test:e2e`) that launch
+  a real VS Code window with the extension, open the built-in preview of a
+  fixture covering every diagram type, and pin the computed colors of the
+  reported regressions to the pure website themes in dark and light mode.
 
 ## Workflows
 
