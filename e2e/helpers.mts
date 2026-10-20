@@ -75,6 +75,10 @@ export async function launchVscode(colorTheme: string, fixtureName = 'all-diagra
             `--user-data-dir=${userDataDir}`,
             `--extensions-dir=${extensionsDir}`,
             `--extensionDevelopmentPath=${process.cwd()}`,
+            // Open the fixtures folder as the workspace and the chosen
+            // fixture as the active file, so Quick Open can find the
+            // other fixtures for tab-switch scenarios.
+            path.resolve(process.cwd(), 'e2e/fixtures'),
             path.resolve(process.cwd(), `e2e/fixtures/${fixtureName}`),
         ],
         timeout: 120000,
