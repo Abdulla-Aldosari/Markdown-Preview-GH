@@ -16,8 +16,9 @@ points in `package.json`:
 - `markdown.previewStyles` - stylesheets VS Code injects into every preview
   (`overrides.css`, `preview-base.css`, the theme files, and the syntax
   highlighting theme).
-- `markdown.previewScripts` - `dist/mermaid-theme-sync.js`, a classic script
-  that runs inside the preview webview.
+- `markdown.previewScripts` - `dist/mermaid-preview.js`, a small classic
+  script that runs inside the preview webview and loads the Mermaid
+  library lazily from `dist/mermaid/` (see the preview script section).
 - `markdown.markdownItPlugins` - lets `activate` return an
   `extendMarkdownIt(markdownIt)` function that receives the preview's Markdown-it
   instance.
@@ -195,32 +196,38 @@ Pure helpers for the standalone export page:
 - `toLocalFileUri(uri)` - maps `vscode-userdata` URIs to `file` URIs for
   opening in external applications.
 
-### preview/mermaid-theme-sync.mts
+### preview/mermaid-preview.mts
 
-The preview script, bundled by the build into the classic script (IIFE)
-`dist/mermaid-theme-sync.js` (`markdown.previewScripts`). It applies the
-mermaid themes of the mermaid.js.org website and keeps Mermaid diagrams
-consistent with the preview theme. Every diagram source gets a
-`%%{init}%%` theme directive for its type and the preview brightness,
-prepended before the built-in renderer reads it; a source that already
-defines a theme of its own, and a preview whose `markdown.mermaid.*`
-settings carry an explicit user theme, are left untouched. It:
+The preview script, bundled by the build into a small classic script
+(IIFE) `dist/mermaid-preview.js` (`markdown.previewScripts`). The built-in
+diagram renderer never sees the diagrams: the Markdown-it plugin renames
+their class to `mpgh-mermaid`, so this script owns the rendering
+completely. It renders every diagram with the website theme for its type
+and the preview brightness, and caches the finished SVG per brightness and
+source: a render cycle only redraws diagrams whose source changed, and
+cached diagrams are restored without parsing, so content updates never
+flicker unchanged diagrams. It:
 
-- injects the directives inside the wrapped `window.dispatchEvent` for
-  `vscode.markdown.updateContent`, so the sources are themed before any
-  renderer listener reads them,
-- stores the original source in `data-mpgh-mermaid-source` and re-injects
-  it for the current brightness on every render,
-- wraps `window.dispatchEvent` so the host-theme override is in place while
-  the event listeners run (the renderer picks between the light and dark
-  theme names from the host theme classes, which the preview theme can
-  disagree with),
-- watches the first (uninterceptable) render and requests a re-render when
-  it started with the original sources or the wrong host theme (the preview
-  content can arrive after this script evaluated, so the first render is
-  also redone whenever the sources it read carry no theme directive),
-- restores diagram sources before re-rendering, since the renderer empties
-  the diagram elements when it starts.
+- loads the Mermaid library lazily with
+  `import(new URL('mermaid/mermaid.esm.mjs', scriptSrc))` - the official
+  ESM distribution `build/bundle.mts` copies into `dist/mermaid/`, loaded
+  as on-demand chunks exactly like the built-in renderer. Bundling the
+  whole library into one script crashes the webview with a V8
+  out-of-memory (see PROJECT_NOTES),
+- renders without a container argument (`mermaid.render(id, source)`):
+  passing the block itself as the container makes the flowchart renderer
+  read the source from the container's textContent and fail,
+- reads each diagram source from `data-mpgh-mermaid-source` (stored by the
+  Markdown-it plugin), because a rendered block contains SVG markup and
+  the source is gone from the DOM,
+- compares `data-mpgh-cache` keys (brightness + source) instead of markup
+  when restoring cached SVGs: the browser normalizes innerHTML on read,
+  so a markup comparison would rewrite and destroy every cached SVG on
+  every update,
+- re-runs on the `vscode.markdown.updateContent` event and on DOM
+  mutations, coalescing bursts through a scheduled single run,
+- honours an explicit `markdown.mermaid.*` theme choice (anything but
+  `vscode`), which replaces the per-diagram injection entirely.
 
 ### preview/mermaid-theme-logic.mts
 
@@ -261,8 +268,9 @@ dependency is upgraded.
 
 ### preview/mermaid-render.mts
 
-The export renderer script, bundled by the build (with the whole Mermaid
-library) into the classic script (IIFE) `dist/mermaid-render.js`. It runs
+The export renderer script, bundled by the build into a small classic
+script (IIFE) `dist/mermaid-render.js`. Like the preview script it loads
+the Mermaid library lazily from `dist/mermaid/` instead of bundling it. It runs
 only inside the temporary hidden webview the export command opens; it never
 ships with the exported page. It reads the pinned `data-theme-mode` from the
 `.mpgh-body` wrapper, initializes Mermaid with the fallback website theme
@@ -413,15 +421,23 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
 
 - `dist/extension.js` - a single CommonJS file with `vscode` external, so
   the same file runs in the desktop and the web extension host.
-- `dist/mermaid-theme-sync.js` - the preview script as an IIFE classic
+- `dist/mermaid-preview.js` - the preview script as a small IIFE classic
   script.
-- `dist/mermaid-render.js` - the export renderer (with the whole Mermaid
-  library bundled in) as an IIFE classic script, loaded only by the hidden
-  webview the export command opens.
+- `dist/mermaid-render.js` - the export renderer as a small IIFE classic
+  script, loaded only by the hidden webview the export command opens.
+- `dist/zenuml.js` - a standalone ES module carrying Mermaid plus the
+  zenuml diagram definition, loaded lazily by the preview only when a
+  zenuml block exists.
+- `dist/mermaid/` - the official Mermaid ESM distribution
+  (`mermaid.esm.mjs` plus its `chunks/`), copied verbatim by
+  `copyMermaidLibrary(outDir)`. Both webview scripts import it lazily;
+  bundling the whole library into one script instead crashes the webview
+  with a V8 out-of-memory.
 
 `createBuildOptions({ production, outDir })` returns the esbuild
-configurations and `copyStaticStylesheets(outDir)` copies the stylesheets;
-both are exported for the bundle test. `--production` minifies and omits
+configurations, `copyStaticStylesheets(outDir)` copies the stylesheets and
+`copyMermaidLibrary(outDir)` copies the Mermaid distribution; all three
+are exported for the bundle test. `--production` minifies and omits
 source maps; `--watch` rebuilds on change.
 
 ## Settings
