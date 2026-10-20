@@ -121,12 +121,13 @@ The extension entry point, bundled into `dist/extension.js` (`main` and
   (`readPreviewStyles`), build a standalone HTML page, store it under the
   extension's global storage, and open it in the default browser
   (`Open in Browser`) or with the print dialog (`Print...`). Documents
-  containing Mermaid placeholders are first processed by
-  `renderMermaidInHiddenWebview`, which opens a temporary hidden webview
-  (`createWebviewPanel`), loads `dist/mermaid-render.js` into it, receives
-  the finished body (diagrams baked in as static SVG) back through
-  `postMessage` with a 10-second timeout, and disposes the panel. The
-  exported page therefore ships no script and no Mermaid library.
+  containing Mermaid placeholders get the inline export bundle
+  (`dist/mermaid-export.js`, read by `readMermaidExportBundle`) baked
+  into the page, so the browser renders the diagrams itself and no
+  temporary webview is ever opened. Dark pages also carry a light copy
+  of every diagram and a print stylesheet that repaints the page with
+  the light theme, so printing always produces light output while the
+  visible page never changes.
 
 ### markdown-plugin.mts
 
@@ -182,14 +183,13 @@ Pure helpers for the standalone export page:
   the matching `color-scheme` meta and body class, and an optional
   auto-print script.
 - `prepareMermaidHtml(bodyHtml)` - normalizes the Mermaid placeholders
-  (`pre.mermaid` / `div.mermaid`) of a rendered document: strips the
+  (`pre.mermaid` / `div.mermaid`, including the reclassified
+  `mpgh-mermaid` class) of a rendered document: strips the
   `style="all: unset;"` fences carry (so an unrendered fence falls back to a
   normal code block) and reports whether the document contains any diagrams.
-- `buildRendererPageHtml(options)` - builds the HTML of the hidden webview
-  page the export command uses to render diagrams: the theme-pinned body,
-  the renderer script URI, and a CSP allowing only that local script.
-- `parseRendererMessage(message)` - validates the `postMessage` payload the
-  renderer sends back with the finished body HTML.
+- `buildPrintLightThemeCss(css)` - extracts the light theme's variables from
+  the contributed CSS and reapplies them to the dark selectors inside a
+  `@media print` block, so printing a dark page produces light output.
 - `exportFileName(sourceKey, displayName)` - stable, safe file name per
   source document (FNV-1a hash suffix), so repeated exports overwrite each
   other.
@@ -269,24 +269,26 @@ diagram. Locked by `test/mermaid-theme-palettes.test.mts`; regenerated
 manually with a Node one-liner against the pinned mermaid package when the
 dependency is upgraded.
 
-### preview/mermaid-render.mts
+### preview/mermaid-export.mts
 
-The export renderer script, bundled by the build into a small classic
-script (IIFE) `dist/mermaid-render.js`. Like the preview script it loads
-the Mermaid library lazily from `dist/mermaid/` instead of bundling it,
-matches both `mermaid` and the reclassified `mpgh-mermaid` placeholders,
-reads each source from `data-mpgh-mermaid-source`, and loads the
-standalone zenuml bundle when the document contains zenuml. It runs
-only inside the temporary hidden webview the export command opens; it never
-ships with the exported page. It reads the pinned `data-theme-mode` from the
-`.mpgh-body` wrapper, initializes Mermaid with the fallback website theme
-for that brightness, injects the per-diagram theme directive into every
-`pre.mermaid` / `div.mermaid` placeholder exactly like the live preview
-does, replaces each placeholder with its rendered SVG (leaving failed
-diagrams as code blocks), centers each baked SVG with `display: block;
-margin: 0 auto` (the export has no preview wrapper to center it), and posts
-the finished body HTML back to the extension host through
-`acquireVsCodeApi().postMessage`.
+The export renderer, bundled by the build into one classic script (IIFE)
+`dist/mermaid-export.js` carrying the whole Mermaid library and the
+zenuml plugin. The export command bakes it inline into the exported
+page, which runs it inside the browser it was opened in - no temporary
+webview exists anymore. It matches both `mermaid` and the reclassified
+`mpgh-mermaid` placeholders, reads each source from
+`data-mpgh-mermaid-source`, registers the zenuml plugin on Mermaid so
+zenuml renders through the same API as every other diagram type, reads
+the pinned `data-theme-mode` from the `.mpgh-body` wrapper, initializes
+Mermaid with the fallback website theme for that brightness, injects the
+per-diagram theme directive into every non-zenuml placeholder exactly
+like the live preview does, and replaces each placeholder with its
+rendered SVG (leaving failed diagrams as code blocks). Dark pages render
+each diagram twice: a dark copy shown on screen and a light copy
+(`.mpgh-export-diagram-print`) revealed only by the print stylesheet.
+The page shows a themed waiting overlay (spinner + Please Wait) until
+rendering finishes; when the command was `Print...` the bundle calls
+`window.print()` once the diagrams are rendered.
 
 ### preview/mermaid-render-logic.mts
 
@@ -429,8 +431,9 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   the same file runs in the desktop and the web extension host.
 - `dist/mermaid-preview.js` - the preview script as a small IIFE classic
   script.
-- `dist/mermaid-render.js` - the export renderer as a small IIFE classic
-  script, loaded only by the hidden webview the export command opens.
+- `dist/mermaid-export.js` - the whole Mermaid library plus the zenuml
+  plugin as one classic script (IIFE), baked inline into exported pages
+  that contain diagrams.
 - `dist/zenuml.js` - a standalone ES module carrying Mermaid plus the
   zenuml diagram definition, loaded lazily by the preview only when a
   zenuml block exists.
