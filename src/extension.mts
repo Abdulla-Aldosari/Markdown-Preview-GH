@@ -15,6 +15,7 @@ import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
 import { resolveColorMode, validColorModes } from './color-mode.mts';
 import { buildRendererPageHtml, buildStandaloneHtml, exportFileName, parseRendererMessage, prepareMermaidHtml, toLocalFileUri } from './export-html.mts';
+import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
 
@@ -147,7 +148,7 @@ function resetFilePreferences(resource: string): void {
 }
 
 /**
- * Activates the extension: registers the six commands, subscribes a
+ * Activates the extension: registers the seven commands, subscribes a
  * configuration listener that refreshes the preview when the watched
  * settings change, and returns the Markdown-it extension hook.
  * @param context The extension context of the active session.
@@ -174,8 +175,21 @@ export function activate(context: vscode.ExtensionContext): { extendMarkdownIt(m
         vscode.commands.registerCommand('markdown-preview-gh.resetPreferences', resetPreferencesCommand),
         vscode.commands.registerCommand('markdown-preview-gh.setColorMode', setColorModeCommand),
         vscode.commands.registerCommand('markdown-preview-gh.openInBrowser', (args: unknown) => exportDocumentCommand(args, false)),
-        vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true))
+        vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true)),
+        vscode.commands.registerCommand('markdown-preview-gh.openFileOnGitHub', (args: unknown) => openFileOnGitHubCommand(args))
     );
+
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(handleActiveEditorChange),
+        vscode.workspace.onDidOpenTextDocument((document) => {
+            if (document.languageId === 'markdown') {
+                void updateGithubContextKey(document.uri);
+            }
+        })
+    );
+
+    // Seed the context key for the editor the user is looking at right now.
+    void updateGithubContextKey(activeMarkdownUri());
 
     const gfmPlugin = createGfmPlugin(getRenderOptions);
     return {
@@ -288,6 +302,267 @@ function resolveTargetUri(args: unknown): vscode.Uri | undefined {
         return editor.document.uri;
     }
     return undefined;
+}
+
+/** The minimal surface of the built-in git extension API this feature uses. */
+interface GitRemoteLike {
+    name: string;
+    fetchUrl?: string;
+    pushUrl?: string;
+}
+
+interface GitChangeLike {
+    uri: vscode.Uri;
+    status: number;
+}
+
+interface GitRepositoryLike {
+    rootUri: vscode.Uri;
+    state: {
+        HEAD?: { name?: string; commit?: string };
+        remotes: GitRemoteLike[];
+        indexChanges: GitChangeLike[];
+        workingTreeChanges: GitChangeLike[];
+        untrackedChanges: GitChangeLike[];
+        onDidChange: (listener: () => void) => vscode.Disposable;
+    };
+    getObjectDetails(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }>;
+}
+
+interface GitApiLike {
+    getRepository(uri: vscode.Uri): GitRepositoryLike | null;
+}
+
+interface GitExtensionLike {
+    enabled: boolean;
+    getAPI(version: 1): GitApiLike;
+}
+
+/** The context key that gates the `webview/context` menu entry. */
+const githubContextKey = 'markdownPreviewGh.isGitHubRepo';
+
+/** Diagnostic output channel, created only while diagnostic logging is on. */
+let diagnosticLogChannel: vscode.OutputChannel | undefined;
+
+/** Returns whether the `diagnosticLogging` setting is enabled. */
+function isDiagnosticLoggingEnabled(): boolean {
+    return readConfiguration().get<boolean>('diagnosticLogging', false);
+}
+
+/**
+ * Returns the diagnostic output channel, creating it on first use. In the
+ * web extension host, which has no output channels, returns `undefined`.
+ */
+function getDiagnosticLogChannel(): vscode.OutputChannel | undefined {
+    if (!diagnosticLogChannel && typeof vscode.window.createOutputChannel === 'function') {
+        diagnosticLogChannel = vscode.window.createOutputChannel('Markdown Preview GH');
+    }
+    return diagnosticLogChannel;
+}
+
+/**
+ * Appends one line to the diagnostic output channel. A no-op unless the
+ * `diagnosticLogging` setting is enabled, so the channel and its logging
+ * stay dormant until they are needed for troubleshooting.
+ */
+function logDiagnostic(message: string): void {
+    if (!isDiagnosticLoggingEnabled()) {
+        return;
+    }
+    getDiagnosticLogChannel()?.appendLine(`${new Date().toISOString()} ${message}`);
+}
+
+/** Cached promise for the git API, so concurrent lookups activate it once. */
+let gitApiPromise: Promise<GitApiLike | undefined> | undefined;
+
+/** The value most recently written to the context key, if any. */
+let lastGithubRepoState: boolean | undefined;
+
+/** Listener on the current repository's state, rechecking the key after every `git status`. */
+let repoStateListener: vscode.Disposable | undefined;
+
+/**
+ * Resolves the API of the built-in git extension, activating it when needed.
+ * Returns `undefined` when the extension is unavailable (web, disabled, or
+ * not installed).
+ */
+function getGitApi(): Promise<GitApiLike | undefined> {
+    if (!gitApiPromise) {
+        gitApiPromise = resolveGitApi();
+    }
+    return gitApiPromise;
+}
+
+async function resolveGitApi(): Promise<GitApiLike | undefined> {
+    const git = vscode.extensions.getExtension<GitExtensionLike>('vscode.git');
+    if (!git) {
+        logDiagnostic('git api: the vscode.git extension was not found');
+        return undefined;
+    }
+    try {
+        if (!git.isActive) {
+            logDiagnostic('git api: activating vscode.git');
+            await git.activate();
+        }
+        if (git.exports && git.exports.enabled) {
+            logDiagnostic('git api: resolved');
+            return git.exports.getAPI(1);
+        }
+        logDiagnostic('git api: vscode.git exports are unavailable or disabled');
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logDiagnostic(`git api: getAPI threw: ${message}`);
+    }
+    return undefined;
+}
+
+/**
+ * Resolves the github.com location of a document: its repository's GitHub
+ * remote, the current branch (or commit for a detached HEAD), and the
+ * repository-relative path. Returns `undefined` when the document does not
+ * belong to a repository with a GitHub remote, or when git does not track
+ * it (ignored or untracked files cannot exist on github.com).
+ */
+async function resolveGithubLocation(uri: vscode.Uri): Promise<GithubFileLocation | undefined> {
+    logDiagnostic(`check: ${uri.toString()}`);
+    const api = await getGitApi();
+    if (!api) {
+        logDiagnostic('check: no git api available');
+        return undefined;
+    }
+    const repository = api.getRepository(uri);
+    if (!repository) {
+        logDiagnostic(`check: no repository resolved for ${uri.toString()}`);
+        return undefined;
+    }
+    const changes = [...repository.state.indexChanges, ...repository.state.workingTreeChanges, ...repository.state.untrackedChanges].map((change) => ({
+        uri: change.uri.path,
+        status: change.status,
+    }));
+    logDiagnostic(
+        `check: repo ${repository.rootUri.path}; changes index=${repository.state.indexChanges.length} workingTree=${repository.state.workingTreeChanges.length} untracked=${repository.state.untrackedChanges.length}`
+    );
+    if (isIgnoredOrUntracked(changes, uri.path)) {
+        logDiagnostic(`check: untracked or ignored -> hide (${uri.path})`);
+        return undefined;
+    }
+    if (changes.length > 0) {
+        const sample = changes
+            .slice(0, 5)
+            .map((change) => `${change.uri}:${change.status}`)
+            .join(', ');
+        logDiagnostic(`check: no match for ${uri.path}; sample changes: ${sample}`);
+    }
+    const repoRef = findGithubRemote(repository.state.remotes);
+    if (!repoRef) {
+        logDiagnostic('check: no github.com remote on this repository');
+        return undefined;
+    }
+    const head = repository.state.HEAD;
+    const branch = head ? (head.name ?? head.commit) : undefined;
+    if (!branch) {
+        logDiagnostic('check: no HEAD reference (empty repository)');
+        return undefined;
+    }
+    const relativePath = computeRelativePath(repository.rootUri.path, uri.path);
+    if (relativePath === undefined) {
+        logDiagnostic(`check: ${uri.path} is outside the repository root ${repository.rootUri.path}`);
+        return undefined;
+    }
+    // The authoritative check: the path must exist in the repository
+    // history. The change lists above never report ignored files (git
+    // status omits them), so this is what hides .gitignore'd documents,
+    // new files before git status notices them, and staged-only files.
+    try {
+        await repository.getObjectDetails('HEAD', relativePath);
+    } catch {
+        logDiagnostic(`check: not in HEAD -> hide (${relativePath})`);
+        return undefined;
+    }
+    logDiagnostic(`check: resolved ${repoRef.owner}/${repoRef.repo}@${branch}/${relativePath}`);
+    return { ...repoRef, branch, relativePath };
+}
+
+/** Returns the URI of the active editor when it holds a Markdown document. */
+function activeMarkdownUri(): vscode.Uri | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (editor && editor.document.languageId === 'markdown') {
+        return editor.document.uri;
+    }
+    return undefined;
+}
+
+/**
+ * Sets the context key to whether the given document belongs to a repository
+ * with a GitHub remote. Pass `undefined` to clear it. While a document is
+ * being watched, a listener on the repository's state re-runs the check when
+ * `git status` finishes, so files created or deleted in the session stop
+ * showing the entry as soon as git notices them.
+ */
+async function updateGithubContextKey(uri: vscode.Uri | undefined): Promise<void> {
+    if (repoStateListener) {
+        repoStateListener.dispose();
+        repoStateListener = undefined;
+    }
+    if (uri) {
+        const api = await getGitApi();
+        const repository = api ? api.getRepository(uri) : null;
+        if (repository) {
+            repoStateListener = repository.state.onDidChange(() => void updateGithubContextKey(uri));
+            logDiagnostic('key: listening for git status updates');
+        }
+    }
+    const isGithubRepo = uri ? (await resolveGithubLocation(uri)) !== undefined : false;
+    logDiagnostic(`key: ${githubContextKey} = ${isGithubRepo}`);
+    if (isGithubRepo === lastGithubRepoState) {
+        return;
+    }
+    lastGithubRepoState = isGithubRepo;
+    await vscode.commands.executeCommand('setContext', githubContextKey, isGithubRepo);
+}
+
+/**
+ * Recomputes the context key when the active editor changes. A focused
+ * webview (no active editor) leaves the key untouched, so right-clicking a
+ * preview never hides the entry because the preview took focus.
+ */
+function handleActiveEditorChange(editor: vscode.TextEditor | undefined): void {
+    if (editor) {
+        logDiagnostic(`active editor: ${editor.document.languageId} ${editor.document.uri.toString()}`);
+    } else {
+        logDiagnostic('active editor: none (webview or panel focused)');
+    }
+    if (editor && editor.document.languageId === 'markdown') {
+        void updateGithubContextKey(editor.document.uri);
+    }
+    // Any other editor (source code, Output, terminal) leaves the key
+    // untouched: the previews are still on screen and their documents did
+    // not change.
+}
+
+/**
+ * Opens the document on github.com. The preview context menu passes the
+ * document URI; the menu entry is only visible while the context key is
+ * set, so a missing GitHub remote here is a fallback error path.
+ */
+async function openFileOnGitHubCommand(args: unknown): Promise<void> {
+    logDiagnostic(`command: invoked with ${JSON.stringify(args)}`);
+    const uri = resolveTargetUri(args);
+    if (!uri) {
+        vscode.window.showErrorMessage('Open a Markdown file to use this command.');
+        return;
+    }
+    const location = await resolveGithubLocation(uri);
+    if (!location) {
+        vscode.window.showErrorMessage('This file cannot be opened on GitHub. It is not tracked by git or its repository has no GitHub remote.');
+        return;
+    }
+    const url = buildGithubFileUrl(location);
+    logDiagnostic(`command: opening ${url}`);
+    const opened = await vscode.env.openExternal(vscode.Uri.parse(url));
+    if (!opened) {
+        vscode.window.showErrorMessage(`Could not open the file on GitHub: ${url}`);
+    }
 }
 
 /**

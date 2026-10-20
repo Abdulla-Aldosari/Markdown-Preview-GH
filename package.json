@@ -101,6 +101,12 @@
             "Full (1200px)"
           ],
           "default": "normal"
+        },
+        "markdown-preview-gh.diagnosticLogging": {
+          "type": "boolean",
+          "order": 3,
+          "description": "Enables diagnostic logging to the 'Markdown Preview GH' output channel. Useful when troubleshooting the extension.",
+          "default": false
         }
       }
     },
@@ -133,6 +139,11 @@
       {
         "command": "markdown-preview-gh.print",
         "title": "Print...",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.openFileOnGitHub",
+        "title": "Open File on GitHub",
         "category": "Markdown Preview GH"
       }
     ],
@@ -193,6 +204,11 @@
           "command": "markdown-preview-gh.resetPreferences",
           "when": "webviewId == 'markdown.preview'",
           "group": "z_gmpPrefs@4"
+        },
+        {
+          "command": "markdown-preview-gh.openFileOnGitHub",
+          "when": "webviewId == 'markdown.preview' && !isWeb && markdownPreviewGh.isGitHubRepo",
+          "group": "z_gmpSource@1"
         }
       ]
     }

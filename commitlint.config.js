@@ -25,6 +25,7 @@ const baseScopes = [
     ['colorMode', 'resolving the active light/dark color mode', ['src/color-mode.mts']],
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
+    ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
     ['mermaidThemeSync', 'keeping Mermaid diagrams in sync with the preview theme', ['src/preview/']],
 
     // Theme pipeline (build/)

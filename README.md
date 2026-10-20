@@ -93,6 +93,7 @@ Right-click inside the preview to access the following actions directly:
 - **Reset Preferences for this file** - Clear this file's content direction, content width, and theme overrides.
 - **Open in Browser** - Open the rendered document as a standalone page in your default browser.
 - **Print...** - Open the rendered document in your browser and show the print dialog.
+- **Open File on GitHub** - Open the current file on github.com. Only shown when the file belongs to a repository with a GitHub remote and git tracks it (ignored or untracked files are excluded).
 
 ## 🛠️ Configuration
 

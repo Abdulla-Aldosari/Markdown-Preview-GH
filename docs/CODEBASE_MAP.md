@@ -391,6 +391,8 @@ Declared in `package.json` under `configuration`:
   `ltr`).
 - `markdown-preview-gh.contentWidth` - `narrow` | `normal` | `wide` |
   `full` (default `normal`).
+- `markdown-preview-gh.diagnosticLogging` - boolean (default `false`):
+  enables the `Markdown Preview GH` output channel for troubleshooting.
 
 Per-file overrides (`contentDirection`, `contentWidth`, `colorMode`) live in
 `ctx.workspaceState` under the `filePreferences` key, keyed by document URI,
@@ -398,15 +400,33 @@ and are managed by the context menu commands.
 
 ## Commands and menus
 
-Six commands (`commands` and `webview/context` in `package.json`):
+Seven commands (`commands` and `webview/context` in `package.json`):
 
 - `setContentDirection`, `setContentWidth`, `setColorMode`,
   `resetPreferences` - per-file overrides via Quick Picks.
 - `openInBrowser`, `print` - standalone export to the browser.
+- `openFileOnGitHub` - opens the current file on github.com.
 
 The context menu entries appear in the preview (`webviewId ==
 'markdown.preview'`); the export commands also appear in the Command Palette
 for Markdown files (desktop only).
+
+`openFileOnGitHub` is hidden unless the context key
+`markdownPreviewGh.isGitHubRepo` is set. The extension maintains that key
+through the built-in git extension API (`vscode.git`): whenever the active
+Markdown editor changes or a Markdown document opens, it resolves the
+document's repository, looks for a github.com remote (preferring `origin`),
+and sets the key with `setContext`. Files that cannot exist on github.com
+are filtered out in two layers: a fast scan of the repository's change
+lists (untracked and ignored entries, matched case-insensitively on URI
+paths), and the decisive `getObjectDetails('HEAD', relativePath)` check,
+which hides gitignored files and files that were never committed - `git
+status` does not report ignored files through the API at all. The key is
+left untouched when the active editor is not a Markdown document (webview
+focus, Output panel, other editors), so the entry stays visible for the
+previews on screen; a listener on the repository's state re-runs the check
+whenever `git status` finishes. Remote parsing and URL building live in
+the pure `src/github-url.mts` module.
 
 ## Tests
 
@@ -416,6 +436,14 @@ One test file per module, all run with `npm test`:
 - `test/export-html.test.mts` - `forceTheme`, `prepareMermaidHtml`,
   `buildStandaloneHtml`, `buildRendererPageHtml`, `parseRendererMessage`,
   `exportFileName`, `toLocalFileUri`, HTML escaping.
+- `test/github-url.test.mts` - GitHub remote parsing (HTTPS, SSH, scp-like
+  forms, sub-group owners), remote selection, repository-relative paths,
+  blob URL building, and the untracked/ignored change-list filter with
+  case-insensitive path matching.
+- `test/github-command.test.mts` - the Open File on GitHub wiring end to
+  end: the extension bundle loaded with a vscode stand-in and a fake git
+  API, driving activation, editor switches, the state listener, the HEAD
+  existence check, and the command itself.
 - `test/mermaid-theme-logic.test.mts` - the pure logic of the preview
   script.
 - `test/mermaid-render-logic.test.mts` - the pure logic of the export
