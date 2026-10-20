@@ -152,7 +152,7 @@ ${sanitizeInlineCss(css)}
  * Matches the opening tag of a Mermaid placeholder the preview renderer
  * emits: a `pre.mermaid` code fence or a `div.mermaid` custom container.
  */
-const mermaidBlockTag = /<(pre|div)\s[^>]*class="[^"]*\bmermaid\b[^"]*"[^>]*>/g;
+const mermaidBlockTag = /<(pre|div)\s[^>]*class="[^"]*\b(?:mermaid|mpgh-mermaid)\b[^"]*"[^>]*>/g;
 
 /** The inline style that strips all code-block styling from a Mermaid fence. */
 const mermaidUnsetStyle = /\s+style="all:\s*unset;"/;
