@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMermaidConfig, rendererMessageType, resolveExportBrightness } from '../src/preview/mermaid-render-logic.mts';
+import { selectLargestCacheEntries, buildMermaidConfig, rendererMessageType, resolveExportBrightness } from '../src/preview/mermaid-render-logic.mts';
 
 test('resolveExportBrightness maps pinned modes directly', () => {
     assert.equal(resolveExportBrightness('light', true), 'light');
@@ -40,4 +40,19 @@ test('buildMermaidConfig renders dark diagrams with the website dark theme', () 
 
 test('the renderer message type is stable', () => {
     assert.equal(rendererMessageType, 'mpgh-mermaid-render');
+});
+test('selectLargestCacheEntries keeps the largest entries under the limit', () => {
+    const entries = [
+        ['small', 'aa'],
+        ['medium', 'aaaaaa'],
+        ['large', 'aaaaaaaaaaaa'],
+    ] as const;
+    assert.deepEqual(selectLargestCacheEntries(entries, 30), [
+        ['large', 'aaaaaaaaaaaa'],
+        ['medium', 'aaaaaa'],
+    ]);
+});
+
+test('selectLargestCacheEntries keeps a single oversized entry', () => {
+    assert.deepEqual(selectLargestCacheEntries([['huge', 'x'.repeat(500)]], 100), [['huge', 'x'.repeat(500)]]);
 });
