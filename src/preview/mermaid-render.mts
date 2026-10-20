@@ -14,13 +14,13 @@
  * returned static SVG markup into the file, so the final page needs no
  * JavaScript at all.
  *
- * The pure decision logic lives in `mermaid-render-logic.mts`; the shared
- * color palettes live in `mermaid-theme-logic.mts`. The build bundles this
- * file (with the whole mermaid library) into a classic script.
+ * The pure decision logic lives in `mermaid-render-logic.mts` and
+ * `mermaid-diagram-theme.mts`. The build bundles this file (with the whole
+ * mermaid library) into a classic script.
  */
 
 import mermaid from 'mermaid';
-import { palettes } from './mermaid-theme-logic.mts';
+import { injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { buildMermaidConfig, rendererMessageType, resolveExportBrightness } from './mermaid-render-logic.mts';
 
 interface RendererVscodeApi {
@@ -47,16 +47,14 @@ function targetBrightness(): 'light' | 'dark' {
 }
 
 /**
- * Replaces every mermaid placeholder with its rendered SVG. A diagram that
- * fails to render is left as-is, so it degrades to a plain code block instead
- * of breaking the page.
+ * Replaces every mermaid placeholder with its rendered SVG. Each diagram is
+ * rendered with the website theme for its type, injected into its source
+ * exactly like the live preview does. A diagram that fails to render is
+ * left as-is, so it degrades to a plain code block instead of breaking the
+ * page.
  */
 async function renderDiagrams(): Promise<void> {
     const brightness = targetBrightness();
-    const root = document.documentElement;
-    for (const [name, value] of Object.entries(palettes[brightness])) {
-        root.style.setProperty(name, value);
-    }
     mermaid.initialize(buildMermaidConfig(brightness));
     const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre.mermaid, div.mermaid'));
     for (let index = 0; index < blocks.length; index++) {
@@ -69,7 +67,7 @@ async function renderDiagrams(): Promise<void> {
             if (!source) {
                 continue;
             }
-            const { svg } = await mermaid.render(`mpgh-mermaid-${index}`, source);
+            const { svg } = await mermaid.render(`mpgh-mermaid-${index}`, injectThemeDirective(source, brightness));
             const template = document.createElement('template');
             template.innerHTML = svg;
             const diagram = template.content.firstElementChild;

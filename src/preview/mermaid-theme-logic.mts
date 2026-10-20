@@ -13,6 +13,30 @@
 export type Brightness = 'light' | 'dark';
 
 /**
+ * The mermaid theme names the diagrams render with per brightness: mermaid's
+ * `default` theme in light mode and its `dark` theme in dark mode — the same
+ * themes the mermaid.js.org website shows its examples with.
+ */
+export const siteThemes: Readonly<Record<Brightness, 'default' | 'dark'>> = {
+    light: 'default',
+    dark: 'dark',
+};
+
+/**
+ * Decides the brightness the diagrams must render with. `light` and `dark`
+ * imply their brightness directly; anything else follows the host.
+ */
+export function resolvePreviewBrightness({ mode, hostIsDark }: ThemeState): Brightness {
+    if (mode === 'light') {
+        return 'light';
+    }
+    if (mode === 'dark') {
+        return 'dark';
+    }
+    return hostIsDark ? 'dark' : 'light';
+}
+
+/**
  * Host theme variables read by the diagram renderer, resolved from the
  * default light and dark themes.
  */
