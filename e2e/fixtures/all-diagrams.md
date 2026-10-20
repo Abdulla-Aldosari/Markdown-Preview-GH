@@ -1,6 +1,6 @@
 # Mermaid Theme Audit
 
-## flowchart
+## 01 - flowchart
 
 ```mermaid
 flowchart LR
@@ -9,7 +9,7 @@ flowchart LR
     B -->|No| D[Skip]
 ```
 
-## sequenceDiagram
+## 02 - sequenceDiagram
 
 ```mermaid
 sequenceDiagram
@@ -20,7 +20,7 @@ sequenceDiagram
     Alice->>Bob: See you later!
 ```
 
-## classDiagram
+## 03 - classDiagram
 
 ```mermaid
 classDiagram
@@ -33,7 +33,7 @@ classDiagram
     Animal <|-- Dog
 ```
 
-## stateDiagram
+## 04 - stateDiagram
 
 ```mermaid
 stateDiagram-v2
@@ -44,7 +44,7 @@ stateDiagram-v2
     Crash --> [*]
 ```
 
-## erDiagram
+## 05 - erDiagram
 
 ```mermaid
 erDiagram
@@ -59,10 +59,11 @@ erDiagram
     }
 ```
 
-## gitGraph
+## 06 - gitGraph
 
 ```mermaid
 gitGraph
+title This title is just a test for all the diagrams.
    commit
    commit
    branch develop
@@ -73,7 +74,7 @@ gitGraph
    merge develop
 ```
 
-## pie
+## 07 - pie
 
 ```mermaid
 pie title Pets adopted
@@ -82,7 +83,7 @@ pie title Pets adopted
     "Birds" : 15
 ```
 
-## quadrantChart
+## 08 - quadrantChart
 
 ```mermaid
 quadrantChart
@@ -97,7 +98,7 @@ quadrantChart
     Campaign B: [0.45, 0.23]
 ```
 
-## requirementDiagram
+## 09 - requirementDiagram
 
 ```mermaid
 requirementDiagram
@@ -111,7 +112,7 @@ requirementDiagram
     test_entity - satisfies -> test_req
 ```
 
-## gantt
+## 10 - gantt
 
 ```mermaid
 gantt
@@ -122,7 +123,7 @@ gantt
     Another task :after a1, 20d
 ```
 
-## journey
+## 11 - journey
 
 ```mermaid
 journey
@@ -135,7 +136,7 @@ journey
       Sit down: 4: Me
 ```
 
-## mindmap
+## 12 - mindmap
 
 ```mermaid
 mindmap
@@ -147,7 +148,7 @@ mindmap
     Text formatting
 ```
 
-## timeline
+## 13 - timeline
 
 ```mermaid
 timeline
@@ -157,15 +158,16 @@ timeline
     2006 : Twitter
 ```
 
-## sankey
+## 14 - sankey
 
 ```mermaid
-sankey-beta
-  A, B : 30
-  A, C : 70
+sankey
+Bio-conversion,Losses,26.862
+Bio-conversion,Solid,280.322
+Bio-conversion,Gas,81.144
 ```
 
-## xyChart
+## 15 - xyChart
 
 ```mermaid
 xychart-beta
@@ -176,7 +178,7 @@ xychart-beta
     line [30, 40, 60]
 ```
 
-## block
+## 16 - block
 
 ```mermaid
 block-beta
@@ -185,7 +187,7 @@ block-beta
     D E F
 ```
 
-## packet
+## 17 - packet
 
 ```mermaid
 packet-beta
@@ -194,10 +196,11 @@ title Example
 11-20: "world"
 ```
 
-## kanban
+## 18 - kanban
 
 ```mermaid
 kanban
+title This title is test
   Todo
     [Create Documentation]
     [Buy Milk]
@@ -205,7 +208,7 @@ kanban
     [Buy Eggs]
 ```
 
-## architecture
+## 19 - architecture
 
 ```mermaid
 architecture-beta
@@ -215,28 +218,11 @@ architecture-beta
     db:R --> L:web
 ```
 
-## radar
-
-```mermaid
-radar-beta
-  axis Sensitivity, Performance, Cost
-  curve A[80, 90, 60]
-  curve B[50, 40, 90]
-```
-
-## treemap
-
-```mermaid
-treemap-beta
-  Market
-    TSLA 100
-    AAPL 500
-```
-
-## venn
+## 20 - venn
 
 ```mermaid
 venn-beta
+title This title is just a test for all the diagrams.
   set Desirable
   set Feasible
   set Viable
@@ -246,7 +232,9 @@ venn-beta
   union Desirable,Feasible,Viable["Ship it"]
 ```
 
-## swimlane
+vvvvvvvv
+
+## 21 - swimlane
 
 ```mermaid
 swimlane-beta
@@ -254,7 +242,7 @@ A[Service] --> B[Database]
 C[Client] --> A
 ```
 
-## treeView
+## 22 - treeView
 
 ```mermaid
 treeView-beta
@@ -265,7 +253,7 @@ treeView-beta
       format.ts
 ```
 
-## c4
+## 23 - c4
 
 ```mermaid
 C4Context
@@ -275,15 +263,9 @@ C4Context
   Rel(customer, system, "Uses")
 ```
 
-## zenuml
+vvvvvv
 
-```mermaid
-zenuml
-  A->B: request
-  B->A: response
-```
-
-## ishikawa
+## 24 - ishikawa
 
 ```mermaid
 ishikawa-beta
@@ -292,26 +274,122 @@ cause Problem 1
 cause Problem 2
 ```
 
-## cynefin
+## 25 - radar1
+
+```mermaid
+radar-beta
+  title Restaurant Comparison
+  axis food["Food Quality"], service["Service"], price["Price"]
+  axis ambiance["Ambiance"]
+
+  curve a["Restaurant A"]{4, 3, 2, 4}
+  curve b["Restaurant B"]{3, 4, 3, 3}
+  curve c["Restaurant C"]{2, 3, 4, 2}
+  curve d["Restaurant D"]{2, 2, 4, 3}
+
+  graticule polygon
+  max 5
+```
+
+## 26 - radar2
+
+```mermaid
+---
+config:
+  radar:
+    axisScaleFactor: 0.25
+    curveTension: 0.1
+  theme: base
+  themeVariables:
+    radar:
+      curveOpacity: 0
+---
+radar-beta
+title This title is just a test for all the diagrams
+  axis A, B, C, D, E
+  curve c1{1,2,3,4,5}
+  curve c2{5,4,3,2,1}
+  curve c3{3,3,3,3,3}
+
+```
+
+## 27 - treemap
+
+```mermaid
+treemap-beta
+title This title is just a test for all the diagrams.
+"Products"
+    "Electronics"
+        "Phones": 50
+        "Computers": 30
+        "Accessories": 20
+    "Clothing"
+        "Men's": 40
+        "Women's": 40
+```
+
+## 28 - Cynefin
 
 ```mermaid
 cynefin-beta
-title Example
-n-1[Complex]
-n-2[Complicated]
+  title Incident Response
+
+  complex
+    "Investigate root cause"
+    "Run chaos experiment"
+
+  complicated
+    "Analyze performance data"
+    "Expert review needed"
+
+  clear
+    "Restart service"
+    "Apply known fix"
+
+  chaotic
+    "Page on-call immediately"
+
+  confusion
+    "Unknown failure mode"
 ```
 
-## wardley
+## 29 - zenuml
 
 ```mermaid
-wardley
-anchor Customer[0.9, 0.1]
-component A[0.5, 0.5]
+---
+config:
+  theme: redux-dark-color
+---
+zenuml
+    title Reply message
+    Client->A.method() {
+      B.method() {
+        if(condition) {
+          return x1
+          // return early
+          @return
+          A->Client: x11
+        }
+      }
+      return x2
+    }
 ```
 
-## eventmodeling
+## 30 - wardley
 
 ```mermaid
-eventmodeling
-Customer -> Website[1]
+
+wardley-beta
+title Forces
+
+component Legacy [0.20, 0.85]
+component Modern [0.55, 0.60]
+component AI [0.70, 0.35]
+
+Legacy -> Modern
+Modern -> AI
+
+accelerator "AI Adoption" [0.55, 0.25]
+deaccelerator "Legacy Constraints" [0.15, 0.75]
+
 ```

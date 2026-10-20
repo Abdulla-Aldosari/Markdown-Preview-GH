@@ -15,7 +15,7 @@ export interface AuditEntry {
     name: string;
     error?: string;
     colors: string[];
-    injected?: boolean;
+    rendered?: boolean;
 }
 
 export interface AuditResult {
@@ -35,8 +35,16 @@ export interface LaunchedVscode {
  * fixture open, using a fresh user-data dir pinned to the requested color
  * theme.
  */
-export async function launchVscode(colorTheme: string): Promise<LaunchedVscode> {
-    const executablePath = await downloadAndUnzipVSCode('stable');
+/**
+ * The VS Code version the E2E suite runs against. 1.142.0 ships a known V8
+ * renderer crash ("young object promotion failed", microsoft/vscode#341813)
+ * that kills the preview webview while diagrams render, so the suite pins
+ * the last stable release until VS Code ships a fix.
+ */
+const e2eVscodeVersion = process.env.MPGH_VSCODE_VERSION ?? '1.141.2';
+
+export async function launchVscode(colorTheme: string, fixtureName = 'all-diagrams.md'): Promise<LaunchedVscode> {
+    const executablePath = await downloadAndUnzipVSCode(e2eVscodeVersion);
     const userDataDir = path.join(os.tmpdir(), `mpgh-e2e-${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
     fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });
     // An empty extensions dir keeps the machine-wide installed extensions
@@ -67,7 +75,7 @@ export async function launchVscode(colorTheme: string): Promise<LaunchedVscode> 
             `--user-data-dir=${userDataDir}`,
             `--extensions-dir=${extensionsDir}`,
             `--extensionDevelopmentPath=${process.cwd()}`,
-            path.resolve(process.cwd(), 'e2e/fixtures/all-diagrams.md'),
+            path.resolve(process.cwd(), `e2e/fixtures/${fixtureName}`),
         ],
         timeout: 120000,
     });
@@ -104,18 +112,12 @@ export async function openMarkdownPreview(page: Page): Promise<Frame> {
             polling: 500,
         });
     } catch {
-        console.log(
-            'PREVIEW CONTENT DEBUG:',
-            await frame.evaluate(() => ({
-                bodyClass: document.body.className,
-                innerHtml: document.body.innerHTML.slice(0, 800),
-            }))
-        );
+        console.log('PREVIEW CONTENT DEBUG:', await frame.evaluate(() => ({ bodyClass: document.body.className, innerHtml: document.body.innerHTML.slice(0, 600) })));
         throw new Error('the Markdown preview document did not load');
     }
     await frame.waitForFunction(
         () => {
-            const blocks = Array.from(document.querySelectorAll('.mermaid'));
+            const blocks = Array.from(document.querySelectorAll('.mpgh-mermaid'));
             if (blocks.length === 0) {
                 return false;
             }
@@ -163,7 +165,7 @@ export async function auditDiagramColors(frame: Frame): Promise<AuditResult> {
             let block: Element | null = null;
             let element: Element | null = heading.nextElementSibling;
             while (element && element.tagName !== 'H2') {
-                const found = element.matches('.mermaid') ? element : element.querySelector('.mermaid');
+                const found = element.matches('.mpgh-mermaid') ? element : element.querySelector('.mpgh-mermaid');
                 if (found) {
                     block = found;
                     break;
@@ -189,17 +191,16 @@ export async function auditDiagramColors(frame: Frame): Promise<AuditResult> {
                     }
                 }
             }
-            const context = block instanceof HTMLElement ? (block.dataset.vscodeContext ?? '') : '';
-            const stored = block instanceof HTMLElement ? (block.dataset.mpghMermaidSource ?? '') : '';
+            const rendered = block instanceof HTMLElement && block.dataset.mpghRendered === '1';
             report.push({
                 name,
                 colors: [...colors].slice(0, 25),
-                injected: context.includes('%%{init') || stored !== '',
+                rendered,
             });
         }
         return {
             wrapper: document.querySelector('.mpgh-body') !== null,
-            syncScript: document.querySelector('script[src*="mermaid-theme-sync"]') !== null,
+            syncScript: document.querySelector('script[src*="mermaid-preview"]') !== null,
             entries: report,
         };
     });
