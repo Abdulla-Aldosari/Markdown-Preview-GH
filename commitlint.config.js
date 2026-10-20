@@ -26,7 +26,7 @@ const baseScopes = [
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
-    ['mermaidThemeSync', 'keeping Mermaid diagrams in sync with the preview theme', ['src/preview/']],
+    ['mermaid-preview', 'the preview webview script and its pure decision logic: diagram theming, SVG caching, sequential rendering, and lazy library loading', ['src/preview/']],
 
     // Theme pipeline (build/)
     ['palettes', 'the committed variable snapshot', ['build/palettes/']],
@@ -44,6 +44,7 @@ const baseScopes = [
 
     // test/
     ['tests', 'the node:test suites', ['test/']],
+    ['e2e', 'the end-to-end Playwright suite that drives a real VS Code window', ['e2e/']],
 
     // docs/ and assets
     ['docs', 'project documentation under docs/', ['docs/']],
