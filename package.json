@@ -2,7 +2,7 @@
   "name": "markdown-preview-gh",
   "displayName": "Markdown Preview GH",
   "description": "A polished Markdown preview with GitHub-style rendering, Mermaid diagrams, RTL support, and per-file layout control.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "Abdulla-Aldosari",
   "license": "MIT",
   "icon": "images/logo256.png",
