@@ -8,30 +8,56 @@
 /**
  * Renders the Mermaid placeholders of an exported page directly inside the
  * browser the page was opened in, so the export command never needs a
- * temporary webview in VS Code. The whole library (Mermaid and the standalone
- * ZenUML bundle) is compiled into this single classic script, which the
- * export bakes inline into the page. Nothing here ships separately.
+ * temporary webview in VS Code. This is a small bootstrap: the page also
+ * bakes the official minified UMD builds of the Mermaid library (and the
+ * zenuml plugin when needed) inline before this script, and those builds
+ * expose themselves on the `window.__esbuild_esm_mermaid_nm` namespace.
  *
- * Each diagram is rendered with the website theme for its type, injected into
- * its source exactly like the live preview does. In addition, when the page
- * is pinned to the dark theme, every diagram is rendered a second time with
- * the light theme; the page shows the dark copy on screen and the light copy
- * is revealed only by the print stylesheet, so printing a dark page produces
- * light diagrams.
+ * Each diagram is rendered with the website theme for its type, injected
+ * into its source exactly like the live preview does. In addition, when the
+ * page is pinned to the dark theme, every diagram is rendered a second time
+ * with the light theme; the page shows the dark copy on screen and the light
+ * copy is revealed only by the print stylesheet, so printing a dark page
+ * produces light diagrams.
  *
  * The pure decision logic lives in `mermaid-render-logic.mts` and
  * `mermaid-diagram-theme.mts`.
  */
 
 import type { MermaidConfig } from 'mermaid';
-import mermaid from 'mermaid';
-import zenumlPlugin from '@mermaid-js/mermaid-zenuml';
 import { detectDiagramType, injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { buildMermaidConfig, resolveExportBrightness } from './mermaid-render-logic.mts';
 
 interface MermaidApi {
     initialize(config: MermaidConfig): void;
     render(id: string, source: string): Promise<{ svg: string }>;
+    registerExternalDiagrams(plugins: unknown[], options?: { lazyLoad?: boolean }): void;
+}
+
+interface ZenumlPlugin {
+    id: string;
+    detector: (text: string) => boolean;
+    loader: () => Promise<unknown>;
+}
+
+/** The namespace the minified UMD builds write their exports to. */
+interface ExportNamespace {
+    mermaid?: NamespaceEntry<MermaidApi>;
+    'mermaid-zenuml'?: NamespaceEntry<ZenumlPlugin>;
+}
+
+/** A UMD namespace slot: the library itself or its default-export wrapper. */
+type NamespaceEntry<T> = T | { default?: T };
+
+/** Unwraps a UMD namespace slot down to the actual export. */
+function unwrapEntry<T>(entry: NamespaceEntry<T> | undefined): T | undefined {
+    if (!entry) {
+        return undefined;
+    }
+    if (typeof entry === 'object' && 'default' in entry && entry.default !== undefined) {
+        return entry.default;
+    }
+    return entry as T;
 }
 
 interface ExportPageOptions {
@@ -42,6 +68,7 @@ interface ExportPageOptions {
 declare global {
     interface Window {
         MPGH_EXPORT?: ExportPageOptions;
+        __esbuild_esm_mermaid_nm?: ExportNamespace;
     }
 }
 
@@ -70,8 +97,8 @@ function rawSource(block: HTMLElement): string {
 }
 
 /**
- * Renders a diagram with the given engine and returns the finished SVG as a
- * centered, block-level element, or `undefined` when the render fails.
+ * Renders a diagram and returns the finished SVG as a centered, block-level
+ * element, or `undefined` when the render fails.
  */
 async function renderDiagram(api: MermaidApi, id: string, source: string): Promise<Element | undefined> {
     const { svg } = await api.render(id, source);
@@ -92,11 +119,20 @@ async function renderDiagram(api: MermaidApi, id: string, source: string): Promi
  * breaking the page.
  */
 async function renderDiagrams(): Promise<void> {
+    const namespace = window.__esbuild_esm_mermaid_nm;
+    const mermaid = unwrapEntry(namespace && namespace.mermaid);
+    if (!mermaid) {
+        throw new Error('The Mermaid library did not load.');
+    }
     const brightness = targetBrightness();
     // The zenuml package is a diagram plugin, not a standalone engine:
     // register it on the bundled Mermaid so zenuml renders through the same
-    // API as every other diagram type.
-    mermaid.registerExternalDiagrams([zenumlPlugin], { lazyLoad: false });
+    // API as every other diagram type. Its minified UMD build is only baked
+    // into the page when the document contains zenuml.
+    const zenumlPlugin = unwrapEntry(namespace && namespace['mermaid-zenuml']);
+    if (zenumlPlugin) {
+        mermaid.registerExternalDiagrams([zenumlPlugin], { lazyLoad: false });
+    }
     mermaid.initialize(buildMermaidConfig(brightness));
     // The preview plugin reclassifies its placeholders to mpgh-mermaid, so
     // the export renderer matches both classes.
