@@ -101,6 +101,9 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
  */
 const mermaidSourceDir = path.join(rootDir, 'node_modules', 'mermaid', 'dist');
 
+/** The one chunk set `mermaid.esm.mjs` loads at runtime. */
+const mermaidChunkSet = 'mermaid.esm';
+
 /**
  * Copies the official Mermaid ESM distribution into `dist/mermaid`. The
  * preview script imports `mermaid/mermaid.esm.mjs` at runtime; that entry
@@ -127,7 +130,10 @@ export function copyMermaidLibrary(outDir: string): void {
             }
         }
     };
-    copyChunks(chunksDir);
+    // The entry file imports only the `mermaid.esm` chunk set. The other sets
+    // in the distribution (`mermaid.core`, `mermaid.esm.min`) serve other
+    // entry files and would only add megabytes nothing loads.
+    copyChunks(path.join(chunksDir, mermaidChunkSet));
 }
 
 export function copyStaticStylesheets(outDir: string): void {

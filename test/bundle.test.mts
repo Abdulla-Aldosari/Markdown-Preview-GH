@@ -75,7 +75,12 @@ test('copyMermaidLibrary publishes the official ESM entry with its chunks', asyn
         assert.ok(entry.includes('mermaid_default as default'), 'the ESM entry must be copied');
         const chunks = fs.readdirSync(path.join(outDir, 'mermaid', 'chunks'), { recursive: true }).filter((name) => typeof name === 'string' && name.endsWith('.mjs'));
         assert.ok(chunks.length > 10, 'the diagram chunks must be copied');
-        assert.ok(chunks.length > 10, 'the diagram chunks must be copied');
+        const chunkSets = fs
+            .readdirSync(path.join(outDir, 'mermaid', 'chunks'), { withFileTypes: true })
+            .filter((item) => item.isDirectory())
+            .map((item) => item.name);
+        assert.deepEqual(chunkSets, ['mermaid.esm'], 'only the chunk set the entry file loads may be copied');
+        assert.ok(entry.includes('chunks/mermaid.esm/'), 'the entry file must load the copied chunk set');
     } finally {
         fs.rmSync(outDir, { recursive: true, force: true });
     }

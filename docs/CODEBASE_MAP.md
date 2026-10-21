@@ -454,8 +454,10 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   zenuml diagram definition, loaded lazily by the preview only when a
   zenuml block exists.
 - `dist/mermaid/` - the official Mermaid ESM distribution
-  (`mermaid.esm.mjs` plus its `chunks/`), copied verbatim by
-  `copyMermaidLibrary(outDir)`. Both webview scripts import it lazily;
+  (`mermaid.esm.mjs` plus its `chunks/mermaid.esm/` set), copied verbatim by
+  `copyMermaidLibrary(outDir)`. The other chunk sets of the distribution
+  (`mermaid.core`, `mermaid.esm.min`) are never loaded and are not copied.
+  Both webview scripts import it lazily;
   bundling the whole library into one script instead crashes the webview
   with a V8 out-of-memory.
 
