@@ -31,11 +31,6 @@ export interface LaunchedVscode {
 }
 
 /**
- * Launches a real VS Code window with this extension loaded and the audit
- * fixture open, using a fresh user-data dir pinned to the requested color
- * theme.
- */
-/**
  * The VS Code version the E2E suite runs against. 1.142.0 ships a known V8
  * renderer crash ("young object promotion failed", microsoft/vscode#341813)
  * that kills the preview webview while diagrams render, so the suite pins
@@ -43,7 +38,18 @@ export interface LaunchedVscode {
  */
 const e2eVscodeVersion = process.env.MPGH_VSCODE_VERSION ?? '1.141.2';
 
-export async function launchVscode(colorTheme: string, fixtureName = 'all-diagrams.md'): Promise<LaunchedVscode> {
+/**
+ * Launches a real VS Code window with this extension loaded and the given
+ * fixture open as the active file, using a fresh user-data dir pinned to
+ * the requested color theme.
+ *
+ * The fixture under test must be passed explicitly - there is no default.
+ * `all-diagrams.md` is reserved for Mermaid diagram tests; a test for any
+ * other feature targets its own fixture. When no fixture matches the
+ * feature yet, create it first (`e2e/fixtures/<feature>.md`) with content
+ * that exercises that feature, and only then write the test against it.
+ */
+export async function launchVscode(colorTheme: string, fixtureName: string): Promise<LaunchedVscode> {
     const executablePath = await downloadAndUnzipVSCode(e2eVscodeVersion);
     const userDataDir = path.join(os.tmpdir(), `mpgh-e2e-${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
     fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });

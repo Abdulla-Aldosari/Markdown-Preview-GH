@@ -11,7 +11,7 @@ import { launchVscode } from './helpers.mts';
 test.setTimeout(180000);
 
 test('rendered diagrams are restored from storage when the preview tab returns', async () => {
-    const { app, page } = await launchVscode('Default Dark Modern');
+    const { app, page } = await launchVscode('Default Dark Modern', 'all-diagrams.md');
     // Open the preview inside the editor group (not to the side), so the
     // preview tab and the editor tab share one group: switching to the
     // editor tab really hides the preview, which is the scenario under

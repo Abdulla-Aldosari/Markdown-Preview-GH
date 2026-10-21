@@ -30,7 +30,7 @@ for (const scenario of [
     { mode: 'light', theme: 'Default Light Modern' },
 ] as const) {
     test(`all mermaid diagrams use the website themes in ${scenario.mode} mode`, async () => {
-        const { app, page } = await launchVscode(scenario.theme);
+        const { app, page } = await launchVscode(scenario.theme, 'all-diagrams.md');
         const logs: string[] = [];
         page.on('console', (message) => {
             if (message.type() === 'error' || message.type() === 'warning') {
