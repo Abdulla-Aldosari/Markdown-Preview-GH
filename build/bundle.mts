@@ -20,10 +20,16 @@
  * - `dist/mermaid-preview-vendor.js`: the whole Mermaid library as a classic
  *   script (IIFE) exposing `window.MermaidVendor`. Loaded on demand by the
  *   preview script, only when diagrams exist.
- * - `dist/mermaid-export.js`: the whole Mermaid library and the standalone
- *   ZenUML bundle compiled into one classic script (IIFE). The export
- *   command bakes it inline into the exported page, which renders its
- *   diagrams inside the browser it was opened in.
+ * - `dist/mermaid-export.js`: a small classic script (IIFE) the export
+ *   command bakes inline into exported pages that contain diagrams. It
+ *   reads the libraries from the `window.__esbuild_esm_mermaid_nm`
+ *   namespace the minified UMD builds below expose, renders the
+ *   placeholders, and prints on demand.
+ * - `dist/mermaid.min.js`: the official minified UMD build of the whole
+ *   Mermaid library, baked inline into the exported page.
+ * - `dist/zenuml.min.js`: the official minified UMD build of the zenuml
+ *   plugin (carrying its own copy of Mermaid), baked inline only for
+ *   documents that contain zenuml diagrams.
  *
  * Usage:
  *   node ./build/bundle.mts [--production] [--watch]
@@ -131,12 +137,25 @@ export function copyStaticStylesheets(outDir: string): void {
     }
 }
 
+/**
+ * Copies the official minified UMD builds of the Mermaid library and the
+ * zenuml plugin into the output directory. The export command bakes them
+ * inline into exported pages, so bundling them again (which blows the page
+ * up to tens of megabytes) is never needed.
+ */
+export function copyExportLibraries(outDir: string): void {
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.copyFileSync(path.join(rootDir, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'), path.join(outDir, 'mermaid.min.js'));
+    fs.copyFileSync(path.join(rootDir, 'node_modules', '@mermaid-js', 'mermaid-zenuml', 'dist', 'mermaid-zenuml.min.js'), path.join(outDir, 'zenuml.min.js'));
+}
+
 async function main(argv: string[]): Promise<void> {
     const production = argv.includes('--production');
     const watch = argv.includes('--watch');
     const outDir = path.join(rootDir, 'dist');
     copyStaticStylesheets(outDir);
     copyMermaidLibrary(outDir);
+    copyExportLibraries(outDir);
     const configs = createBuildOptions({ production, outDir });
     if (watch) {
         for (const config of configs) {
