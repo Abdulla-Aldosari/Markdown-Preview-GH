@@ -93,7 +93,7 @@ VS Code 1.106.0 or later.
 
 ## Installation
 
-- **From the Marketplace:** open the Extensions view in VS Code, search for **Markdown Preview GH**, and select **Install**.
+- **From the Marketplace:** install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Abdulla-Aldosari.markdown-preview-gh), or open the Extensions view in VS Code, search for **Markdown Preview GH**, and select **Install**.
 - **From a VSIX file:** run `code --install-extension markdown-preview-gh-<version>.vsix`, or choose **Install from VSIX...** from the Extensions view menu.
 
 ## Usage
