@@ -6,120 +6,131 @@
 
 <h1 align="center">Markdown Preview GH</h1>
 
-Your everyday Markdown preview, styled exactly like GitHub. Full GFM support, GitHub's light and dark themes, Mermaid diagrams, RTL support, and more — right inside VS Code.
+A polished Markdown preview for VS Code. It does everything you expect from a preview and adds the details that make reading comfortable: GitHub's familiar look in light and dark, Mermaid diagrams, right-to-left support, and layout settings you can tune for each file.
 
 ![Markdown Preview GH example](images/readme/main-screen.png)
 
 ## Features
 
-### GitHub-Flavored Markdown (GFM) extensions
+### GitHub-style rendering
 
-- Renders the preview using GitHub's own CSS, including typography, spacing, tables, and code blocks.
-- Ships with GitHub's light and dark themes.
-- By default, the theme automatically matches your current VS Code color theme (light/dark); it can also be pinned to the light or dark theme.
-- Fully customizable via your own [`markdown.styles`](https://code.visualstudio.com/Docs/languages/markdown#_using-your-own-css) CSS. Target `.mpgh-body` instead of `body` so your rules don't get overridden by the extension's theme.
+The preview is drawn with GitHub's own typography, spacing, tables, and code blocks, so your document reads the way it will on GitHub.
 
-#### 🔵 Code blocks
+- Light and dark themes are built in.
+- By default the theme follows your VS Code color theme. You can also pin it to light or dark.
+- Your own [`markdown.styles`](https://code.visualstudio.com/Docs/languages/markdown#_using-your-own-css) still apply. Target `.mpgh-body` instead of `body` so your rules are not overridden by the extension's theme.
 
-Fenced code blocks render with GitHub's exact syntax highlighting and spacing.
+### Code blocks
+
+Fenced code blocks use GitHub's syntax highlighting and spacing.
 
 ![Code block example](images/readme/code-block-example.png)
 
-#### 🔵 Alerts
+### Alerts
 
-`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes are rendered with GitHub's colored callout boxes and icons, not plain blockquotes.
+`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes become colored callout boxes with icons instead of plain quotes.
 
 ![Alerts example](images/readme/alerts-example.png)
 
-#### 🔵 Task lists
+### Task lists
 
-`- [ ]` / `- [x]` list items render as real (disabled) checkboxes, matching GitHub's rendered issue/PR style.
+`- [ ]` and `- [x]` items render as real, read-only checkboxes.
 
 ![Task list example](images/readme/task-list-example.png)
 
-#### 🔵 Emoji shortcodes
+### Emoji shortcodes
 
-`:tada:`, `:rocket:`, `:bug:`, and the rest of GitHub's shortcode set are converted to their emoji automatically.
+`:tada:`, `:rocket:`, `:bug:`, and the rest of GitHub's shortcode set turn into their emoji automatically.
 
 ![Emoji shortcodes example](images/readme/emoji-example.png)
 
-#### 🔵 Mermaid diagrams
+### Mermaid diagrams
 
-Fenced `mermaid` code blocks render as diagrams, and they automatically follow the preview's theme - the editor-matched, light, or dark theme, including per-file theme overrides.
+Fenced `mermaid` code blocks render as diagrams, ZenUML included. Diagrams follow the preview's theme, so they look right in light, dark, and per-file theme overrides.
 
 ![Mermaid example](images/readme/mermaid-example.png)
 
-#### 🔵 Right-to-left (RTL) language support
+### Right-to-left (RTL) support
 
-- Set the content direction of the preview to `LTR`, `RTL`, or `Auto` (detected from the document content).
-- Code blocks always render left-to-right regardless of the surrounding document direction, since source code is always authored LTR.
-- When the active direction is RTL, alert titles (Note, Tip, Important, Warning, Caution) are automatically localized to Arabic.
+- Set the content direction to `LTR`, `RTL`, or `Auto`, which detects the direction from the document itself.
+- Code blocks always stay left-to-right, because source code is written that way.
+- When the direction is RTL, alert titles (Note, Tip, Important, Warning, Caution) appear in Arabic.
 
 ![RTL language support example](images/readme/rtl-language-example.png)
 
-#### 🔵 Per-file layout preferences
+### Per-file preferences
 
-Content direction, content width, and theme can be overridden on a **per-file basis**, independently of your global settings:
-
-- Right-click inside the preview to access the extension actions directly.
-- **Content Direction...** - choose `LTR`, `RTL`, or `Auto` for the current file only.
-- **Content Width...** - choose `Narrow` (640px), `Normal` (838px, GitHub's own width), `Wide` (1024px), or `Full` (1200px) for the current file only.
-- **Theme...** - choose `Light` or `Dark` for the current file only.
-- **Reset Preferences for this file** - clears any per-file overrides and falls back to your global settings.
-
-Per-file preferences are remembered across sessions for that file, without affecting any other file or your workspace defaults.
-
-#### 🔵 Open in browser and print
-
-- **Open in Browser** - exports the rendered document, with all of its GitHub styling, as a standalone HTML page and opens it in your default browser.
-- **Print...** - does the same and opens the browser's print dialog automatically, so you can print the document or save it as PDF.
-
-Both commands are available directly from the preview context menu and from the Command Palette while a Markdown file is active. Exported pages always use GitHub's light theme, and relative images are resolved against the Markdown file's folder. The generated page is stored in the extension's global storage folder, so nothing is written into your project.
-
-> [!NOTE]
-> 📊 Mermaid diagrams are rendered into the export as static SVG, so they appear in the exported page and in printed/PDF output without needing JavaScript. No multi-megabyte rendering script ships with the file, so exported pages stay small, self-contained, and work offline.
-
-![Print example](images/readme/print-example.png)
-
-#### 🔵 Preview Context Menu
-
-Right-click inside the preview to access the following actions directly:
+Content direction, content width, and theme can be set for a single file without touching your global settings. Right-click inside the preview to reach them:
 
 ![Preview context menu](images/readme/context-menu.png)
 
-- **Content Direction...** - Set the content direction (`LTR` / `RTL` / `Auto`) for the current file only.
-- **Content Width...** - Set the content width (`Narrow` / `Normal` / `Wide` / `Full`) for the current file only.
-- **Theme...** - Set the theme (`Light` / `Dark`) for the current file only.
-- **Reset Preferences for this file** - Clear this file's content direction, content width, and theme overrides.
-- **Open in Browser** - Open the rendered document as a standalone page in your default browser.
-- **Print...** - Open the rendered document in your browser and show the print dialog.
-- **Open File on GitHub** - Open the current file on github.com. Only shown when the file belongs to a repository with a GitHub remote and git tracks it (ignored or untracked files are excluded).
+- **Content Direction...** - choose `LTR`, `RTL`, or `Auto`.
+- **Content Width...** - choose `Narrow` (640px), `Normal` (838px, GitHub's own width), `Wide` (1024px), or `Full` (1200px).
+- **Theme...** - choose `Light` or `Dark`.
+- **Reset Preferences for this file** - clear this file's overrides and return to your global settings.
 
-## 🛠️ Configuration
+These choices are remembered for the file in the current workspace, and they never affect other files.
 
-These settings control the extension's global defaults. Per-file overrides (see [Per-file layout preferences](#per-file-layout-preferences)) always take priority over them for the files they're set on.
+### Open in Browser and Print
 
-- `markdown-preview-gh.colorTheme`
+- **Open in Browser** - turns the rendered document into a standalone HTML page and opens it in your default browser.
+- **Print...** - does the same and opens the browser's print dialog, so you can print the document or save it as PDF.
 
-    ⚙️ Determines how the preview picks its GitHub color theme. Default: `auto`.
+Both are available from the preview context menu and from the Command Palette while a Markdown file is active. The page follows the theme of your preview, and printing always produces light output. Relative images are resolved against the Markdown file's folder, and the generated page is kept in the extension's storage folder, so nothing is added to your project.
 
-    - `Match the editor theme` (`auto`): Use the GitHub theme that matches the editor's light/dark color theme.
-    - `Dark`: Always display the preview with GitHub's dark theme.
-    - `Light`: Always display the preview with GitHub's light theme.
+> [!NOTE]
+> Mermaid diagrams are drawn inside the exported page itself, so the page is fully self-contained and works offline.
 
-- `markdown-preview-gh.contentDirection`
+![Print example](images/readme/print-example.png)
 
-    ⚙️ Default content direction for the Markdown preview content. Default: `ltr`.
+### Open File on GitHub
 
-    - `ltr`: Left to right.
-    - `rtl`: Right to left.
-    - `auto`: Detect automatically from the content.
+**Open File on GitHub** opens the current file on github.com from the preview context menu. It appears only when the file belongs to a repository with a GitHub remote and git tracks it, so ignored and untracked files never show it.
 
-- `markdown-preview-gh.contentWidth`
+## Requirements
 
-    ⚙️ Default content width for the Markdown preview. Default: `normal`.
+VS Code 1.106.0 or later.
 
-    - `narrow`: 640px
-    - `normal`: 838px - matches GitHub's own content width
-    - `wide`: 1024px
-    - `full`: 1200px
+## Installation
+
+- **From the Marketplace:** open the Extensions view in VS Code, search for **Markdown Preview GH**, and select **Install**.
+- **From a VSIX file:** run `code --install-extension markdown-preview-gh-<version>.vsix`, or choose **Install from VSIX...** from the Extensions view menu.
+
+## Usage
+
+Open any Markdown file and open VS Code's regular preview with `Ctrl+Shift+V` (`Cmd+Shift+V` on macOS) or `Ctrl+K V` to open it beside the editor. The extension styles that preview automatically; there is nothing to switch on.
+
+Right-click inside the preview for the per-file preferences, export, and GitHub actions described above.
+
+## Commands
+
+| Command                         | Where to find it                      |
+| ------------------------------- | ------------------------------------- |
+| Content Direction...            | Preview context menu                  |
+| Content Width...                | Preview context menu                  |
+| Theme...                        | Preview context menu                  |
+| Reset Preferences for this file | Preview context menu                  |
+| Open in Browser                 | Preview context menu, Command Palette |
+| Print...                        | Preview context menu, Command Palette |
+| Open File on GitHub             | Preview context menu                  |
+
+Command Palette entries are listed under the **Markdown Preview GH** category.
+
+## Settings
+
+These settings define the global defaults. Per-file preferences (see [Per-file preferences](#per-file-preferences)) always take priority for the files they are set on.
+
+| Setting                                 | Default  | Description                                                                             |
+| --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
+| `markdown-preview-gh.colorTheme`        | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.         |
+| `markdown-preview-gh.contentDirection`  | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                 |
+| `markdown-preview-gh.contentWidth`      | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px). |
+| `markdown-preview-gh.diagnosticLogging` | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.               |
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+## License
+
+Released under the [MIT License](LICENSE).

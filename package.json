@@ -1,7 +1,7 @@
 {
   "name": "markdown-preview-gh",
   "displayName": "Markdown Preview GH",
-  "description": "Brings GitHub's own styling and rendering details to VS Code's built-in Markdown preview.",
+  "description": "A polished Markdown preview with GitHub-style rendering, Mermaid diagrams, RTL support, and per-file layout control.",
   "version": "1.0.0",
   "publisher": "Abdulla-Aldosari",
   "license": "MIT",
@@ -10,8 +10,10 @@
     "vscode": "^1.106.0"
   },
   "repository": {
+    "type": "git",
     "url": "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH.git"
   },
+  "homepage": "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH",
   "bugs": {
     "url": "https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/issues"
   },
