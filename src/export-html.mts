@@ -122,32 +122,46 @@ export interface StandaloneHtmlOptions {
     /** The theme the page is pinned to. Defaults to `light`. */
     theme?: ThemeMode;
     /**
-     * The inline Mermaid bundle baked into the page. Included only for
+     * The inline Mermaid bootstrap baked into the page. Included only for
      * documents with diagrams; the page then shows a themed waiting overlay
      * until the diagrams are rendered.
      */
     mermaidScript?: string;
+    /**
+     * The minified UMD Mermaid library, baked inline before the bootstrap.
+     * Required whenever `mermaidScript` is present.
+     */
+    mermaidLibrary?: string;
+    /**
+     * The minified UMD zenuml plugin library, baked inline only for
+     * documents that contain zenuml diagrams.
+     */
+    zenumlLibrary?: string;
 }
 
 /**
  * Builds the print stylesheet addition that repaints the page with the light
- * theme: the light theme's variables, extracted from the contributed CSS, are
- * reapplied to the dark selectors inside a `@media print` block, so printing
- * a dark page always produces light output while the screen stays untouched.
+ * theme: every CSS block whose selector targets the light theme (variables,
+ * syntax-highlighting token colors, and any other explicit colors) is copied
+ * into a `@media print` block with `light` flipped to `dark` in its
+ * selector, so printing a dark page produces fully light output while the
+ * visible page never changes.
  */
 export function buildPrintLightThemeCss(css: string): string {
-    const declarations: string[] = [];
-    const blockPattern = /\[data-theme-mode=light\][^{]*\{([\s\S]*?)\}/g;
+    const blocks: string[] = [];
+    const blockPattern = /([^{}]+)\{([\s\S]*?)\}/g;
     let match: RegExpExecArray | null;
     while ((match = blockPattern.exec(css)) !== null) {
-        for (const declaration of match[1].match(/--[\w-]+\s*:[^;]+;?/g) ?? []) {
-            declarations.push(`    ${declaration.trim().replace(/;$/, '')};`);
+        const selector = match[1];
+        if (!/data-theme-mode\s*=\s*["']?light|vscode-light|prefers-color-scheme:\s*light/.test(selector)) {
+            continue;
         }
+        blocks.push(`    ${selector.replace(/light/g, 'dark')} {\n${match[2]}\n    }`);
     }
-    if (declarations.length === 0) {
+    if (blocks.length === 0) {
         return '';
     }
-    return `\n@media print {\n    html[data-theme-mode='dark'],\n    body.vscode-dark,\n    body.vscode-high-contrast {\n        color-scheme: light;\n${declarations.join('\n')}\n    }\n}\n`;
+    return `\n@media print {\n${blocks.join('\n')}\n}\n`;
 }
 
 /** The stylesheet the page carries only when diagrams must be rendered. */
@@ -161,14 +175,34 @@ function mermaidWaitingOverlayHtml(): string {
 }
 
 /** The inline scripts the page carries when it must render diagrams. */
-function mermaidExportHtml(autoPrint: boolean, mermaidScript: string): string {
-    return `${mermaidWaitingOverlayHtml()}\n        <script>window.MPGH_EXPORT = { print: ${autoPrint ? 'true' : 'false'} };</script>\n        <script>\n${mermaidScript}\n        </script>`;
+function mermaidExportHtml(autoPrint: boolean, mermaidScript: string, mermaidLibrary: string, zenumlLibrary?: string): string {
+    return `${mermaidWaitingOverlayHtml()}
+        <script>window.MPGH_EXPORT = { print: ${autoPrint ? 'true' : 'false'} };</script>
+        <script>
+${mermaidLibrary}
+        </script>
+        <script>
+${zenumlLibrary ?? ''}
+        </script>
+        <script>
+${mermaidScript}
+        </script>`;
 }
 
-export function buildStandaloneHtml({ title, bodyHtml, css, baseHref, autoPrint = false, theme = 'light', mermaidScript }: StandaloneHtmlOptions): string {
+export function buildStandaloneHtml({
+    title,
+    bodyHtml,
+    css,
+    baseHref,
+    autoPrint = false,
+    theme = 'light',
+    mermaidScript,
+    mermaidLibrary,
+    zenumlLibrary,
+}: StandaloneHtmlOptions): string {
     const baseTag = baseHref ? `<base href="${escapeHtml(baseHref)}">` : '';
     const printScript = autoPrint && !mermaidScript ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
-    const mermaidHtml = mermaidScript ? mermaidExportHtml(autoPrint, mermaidScript) : '';
+    const mermaidHtml = mermaidScript && mermaidLibrary ? mermaidExportHtml(autoPrint, mermaidScript, mermaidLibrary, zenumlLibrary) : '';
     return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        ${baseTag}\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n${mermaidScript ? mermaidExportCss() : ''}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
 }
 
@@ -181,10 +215,18 @@ const mermaidBlockTag = /<(pre|div)\s[^>]*class="[^"]*\b(?:mermaid|mpgh-mermaid)
 /** The inline style that strips all code-block styling from a Mermaid fence. */
 const mermaidUnsetStyle = /\s+style="all:\s*unset;"/;
 
+/**
+ * Matches the source attribute of a placeholder whose diagram source starts
+ * with the zenuml type, which requires the separate zenuml library.
+ */
+const zenumlSourceTag = /data-mpgh-mermaid-source\s*=\s*["'][^"']*zenuml\b/i;
+
 export interface PreparedMermaidBody {
     html: string;
     /** True when the document contains at least one Mermaid placeholder. */
     hasMermaid: boolean;
+    /** True when the document contains at least one zenuml diagram. */
+    hasZenuml: boolean;
 }
 
 /**
@@ -200,5 +242,5 @@ export function prepareMermaidHtml(bodyHtml: string): PreparedMermaidBody {
         hasMermaid = true;
         return tag.startsWith('<pre') ? tag.replace(mermaidUnsetStyle, '') : tag;
     });
-    return { html, hasMermaid };
+    return { html, hasMermaid, hasZenuml: zenumlSourceTag.test(html) };
 }
