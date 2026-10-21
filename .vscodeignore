@@ -10,6 +10,7 @@ test/
 src/
 build/
 docs/*.md
+images/readme/
 e2e/
 playwright.config.ts
 test-results/
