@@ -584,13 +584,18 @@ async function readPreviewStyles(ctx: vscode.ExtensionContext): Promise<string> 
 }
 
 /**
- * Reads the inline Mermaid bundle the exported page needs to render its
- * diagrams in the browser, so the export command never opens a temporary
- * webview in VS Code.
+ * Reads the inline scripts the exported page needs to render its diagrams in
+ * the browser, so the export command never opens a temporary webview in VS
+ * Code: the small bootstrap plus the official minified UMD library builds
+ * (the zenuml library only for documents that contain zenuml).
  */
-async function readMermaidExportBundle(ctx: vscode.ExtensionContext): Promise<string> {
-    const bytes = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(ctx.extensionUri, 'dist', 'mermaid-export.js'));
-    return new TextDecoder('utf-8').decode(bytes);
+async function readExportScripts(ctx: vscode.ExtensionContext, hasZenuml: boolean): Promise<{ mermaidScript: string; mermaidLibrary: string; zenumlLibrary?: string } | undefined> {
+    const decoder = new TextDecoder('utf-8');
+    const read = async (name: string): Promise<string> => decoder.decode(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(ctx.extensionUri, 'dist', name)));
+    const mermaidScript = await read('mermaid-export.js');
+    const mermaidLibrary = await read('mermaid.min.js');
+    const zenumlLibrary = hasZenuml ? await read('zenuml.min.js') : undefined;
+    return { mermaidScript, mermaidLibrary, zenumlLibrary };
 }
 
 /**
@@ -627,11 +632,11 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         }
         const theme = exportTheme(uri.toString());
         const prepared = prepareMermaidHtml(bodyHtml);
-        const mermaidScript = prepared.hasMermaid ? await readMermaidExportBundle(ctx) : undefined;
+        const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
         const css = await readPreviewStyles(ctx);
         const displayName = uri.path.split('/').pop() || 'document';
         const baseHref = uri.scheme === 'file' ? `${vscode.Uri.joinPath(uri, '..').toString()}/` : undefined;
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: prepared.html, css, baseHref, autoPrint, theme, mermaidScript });
+        const html = buildStandaloneHtml({ title: displayName, bodyHtml: prepared.html, css, baseHref, autoPrint, theme, ...scripts });
 
         await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
         const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
