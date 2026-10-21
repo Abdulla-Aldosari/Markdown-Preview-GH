@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     buildPrintLightThemeCss,
     buildStandaloneHtml,
@@ -168,6 +169,20 @@ test('buildPrintLightThemeCss returns nothing when no light block exists', () =>
     assert.equal(buildPrintLightThemeCss('body { color: red; }'), '');
 });
 
+test('buildPrintLightThemeCss flips the real syntax token palette to light in print', () => {
+    // The light --syntax-* palette lives in a block whose selector list
+    // carries the light activation selectors, so the print filter catches
+    // it and flips it onto the dark selectors. No dark-only token color
+    // may survive into the print block.
+    const css = readFileSync(new URL('../src/styles/syntax-highlighting.css', import.meta.url), 'utf8');
+    const print = buildPrintLightThemeCss(css);
+    assert.match(print, /@media print/);
+    assert.match(print, /\.mpgh-body\[data-theme-mode="dark"\][^{]*\{[^}]*--syntax-keyword: #cf222e;/);
+    assert.match(print, /\.vscode-body\.vscode-dark[^{]*\{[^}]*--syntax-keyword: #cf222e;/);
+    assert.doesNotMatch(print, /#ff7b72/, 'the dark keyword color must not survive in print');
+    assert.doesNotMatch(print, /#9198a1/, 'the dark comment color must not survive in print');
+});
+
 test('buildStandaloneHtml with diagrams embeds the libraries, the overlay and the themed body background', () => {
     const html = buildStandaloneHtml({
         title: 't',
@@ -191,6 +206,7 @@ test('buildStandaloneHtml with diagrams embeds the libraries, the overlay and th
     assert.ok(html.indexOf('/* zenuml lib */') < html.indexOf('/* bootstrap */'));
     assert.match(html, /body \{\n\s*background-color: var\(--bgColor-default\);\n\s*\}/);
     assert.match(html, /\.mpgh-export-diagram-print \{\s*display: none;/);
+    assert.match(html, /print-color-adjust: exact/, 'the print background rule applies to diagram pages too');
     assert.doesNotMatch(html, /window\.addEventListener\('load'/, 'the bundle handles printing itself');
 });
 
@@ -224,6 +240,15 @@ test('buildStandaloneHtml adds the print script only when requested', () => {
     const html = buildStandaloneHtml({ title: 't', bodyHtml: '', css: '', autoPrint: true });
     assert.match(html, /window\.addEventListener\('load', \(\) => window\.print\(\)\)/);
     assert.doesNotMatch(html, /<base /);
+});
+
+test('buildStandaloneHtml forces the code-block background to print', () => {
+    // Browsers print element backgrounds as "economy" by default, so the
+    // code-block background that shows on screen disappears in print. The
+    // page template must opt the code block back in through
+    // print-color-adjust (with the -webkit- fallback) inside @media print.
+    const html = buildStandaloneHtml({ title: 't', bodyHtml: renderedBody, css: '' });
+    assert.match(html, /@media print \{[\s\S]*?\.mpgh-body pre \{[\s\S]*?-webkit-print-color-adjust: exact;[\s\S]*?print-color-adjust: exact;\s*\}/);
 });
 
 test('exportFileName is stable per source and safe for the file system', () => {

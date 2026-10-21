@@ -1,9 +1,16 @@
 /*!
   GitHub syntax highlighting colors for highlight.js (.hljs-*).
   Colors are the GitHub "prettylights" palette for light and dark themes.
+  The light block carries the light activation selectors (fixed light mode
+  and editor-following auto mode) so the export print filter can flip it
+  onto the dark selectors at print time; the bare .mpgh-body selector
+  keeps light as the default for every other mode (e.g. system under a
+  light OS).
 */
 
-.mpgh-body {
+.mpgh-body,
+.mpgh-body[data-theme-mode="light"],
+.vscode-body.vscode-light .mpgh-body[data-theme-mode="auto"] {
   --syntax-comment: #59636e;
   --syntax-constant: #0550ae;
   --syntax-entity: #6639ba;
