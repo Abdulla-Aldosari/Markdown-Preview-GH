@@ -138,7 +138,7 @@ test('buildStandaloneHtml pins a dark export to the dark theme end to end', () =
     assert.match(html, /<p data-theme-mode="dark">/, 'user content must not be rewritten');
 });
 
-test('buildPrintLightThemeCss repaints dark selectors with the light variables for print', () => {
+test('buildPrintLightThemeCss flips every light theme block to dark inside print', () => {
     const css = `
 [data-theme-mode=light],
 .vscode-body.vscode-light [data-theme-mode=auto] {
@@ -146,50 +146,58 @@ test('buildPrintLightThemeCss repaints dark selectors with the light variables f
     --fgColor-danger: #d1242f;
     --bgColor-muted: #f6f8fa;
 }
-[data-theme-mode=dark],
-.vscode-body.vscode-dark [data-theme-mode=auto] {
-    color-scheme: dark;
+.mpgh-body[data-theme-mode="light"],
+.vscode-body.vscode-light .mpgh-body[data-theme-mode="auto"] {
+    --mpgh-code-keyword: #cf222e;
+}
+.token.highlight { background: #eee; }
+[data-theme-mode=dark] {
     --fgColor-danger: #ff7b72;
-    --bgColor-muted: #21262d;
 }`;
     const print = buildPrintLightThemeCss(css);
     assert.match(print, /@media print/);
-    assert.match(print, /html\[data-theme-mode='dark'\]/);
-    assert.match(print, /body\.vscode-dark/);
-    assert.match(print, /body\.vscode-high-contrast/);
-    assert.match(print, /--fgColor-danger: #d1242f;/);
-    assert.match(print, /--bgColor-muted: #f6f8fa;/);
-    assert.match(print, /color-scheme: light;/);
+    // Variables and explicit token colors from light blocks are both carried.
+    assert.match(print, /data-theme-mode=dark[\s\S]*?--fgColor-danger: #d1242f;/);
+    assert.match(print, /\.mpgh-body\[data-theme-mode="dark"\][\s\S]*?--mpgh-code-keyword: #cf222e;/);
+    assert.match(print, /\.vscode-body\.vscode-dark/);
     assert.doesNotMatch(print, /#ff7b72/, 'dark values must not leak into the print block');
+    assert.doesNotMatch(print, /\.token\.highlight \{/, 'unrelated selectors containing "highlight" must be ignored');
 });
 
 test('buildPrintLightThemeCss returns nothing when no light block exists', () => {
     assert.equal(buildPrintLightThemeCss('body { color: red; }'), '');
 });
 
-test('buildPrintLightThemeCss also extracts minified single-line light blocks', () => {
-    const print = buildPrintLightThemeCss('[data-theme-mode=light] { --bgColor-default: #ffffff; --fgColor-default: #1f2328; }');
-    assert.match(print, /--bgColor-default: #ffffff;/);
-    assert.match(print, /--fgColor-default: #1f2328;/);
-});
-
-test('buildStandaloneHtml with diagrams embeds the bundle, the overlay and the themed body background', () => {
+test('buildStandaloneHtml with diagrams embeds the libraries, the overlay and the themed body background', () => {
     const html = buildStandaloneHtml({
         title: 't',
         bodyHtml: mermaidBody,
         css: '',
         theme: 'dark',
         autoPrint: true,
-        mermaidScript: '/* mermaid bundle */',
+        mermaidScript: '/* bootstrap */',
+        mermaidLibrary: '/* mermaid lib */',
+        zenumlLibrary: '/* zenuml lib */',
     });
     assert.match(html, /class="mpgh-export-wait"/);
     assert.match(html, /mpgh-export-wait-spinner/);
     assert.match(html, /Please Wait&hellip;/);
     assert.match(html, /window\.MPGH_EXPORT = \{ print: true \}/);
-    assert.match(html, /<script>\n\/\* mermaid bundle \*\//);
+    assert.match(html, /<script>\n\/\* mermaid lib \*\/\n\s*<\/script>/);
+    assert.match(html, /<script>\n\/\* zenuml lib \*\/\n\s*<\/script>/);
+    assert.match(html, /<script>\n\/\* bootstrap \*\//);
+    // The libraries must come before the bootstrap that reads them.
+    assert.ok(html.indexOf('/* mermaid lib */') < html.indexOf('/* bootstrap */'));
+    assert.ok(html.indexOf('/* zenuml lib */') < html.indexOf('/* bootstrap */'));
     assert.match(html, /body \{\n\s*background-color: var\(--bgColor-default\);\n\s*\}/);
     assert.match(html, /\.mpgh-export-diagram-print \{\s*display: none;/);
     assert.doesNotMatch(html, /window\.addEventListener\('load'/, 'the bundle handles printing itself');
+});
+
+test('buildStandaloneHtml with diagrams omits the zenuml library for plain documents', () => {
+    const html = buildStandaloneHtml({ title: 't', bodyHtml: mermaidBody, css: '', mermaidScript: '/* bootstrap */', mermaidLibrary: '/* mermaid lib */' });
+    assert.doesNotMatch(html, /zenuml/);
+    assert.match(html, /\/\* mermaid lib \*\//);
 });
 
 test('buildStandaloneHtml without diagrams stays a plain page with no overlay', () => {
@@ -235,8 +243,18 @@ test('prepareMermaidHtml detects the reclassified preview placeholders', () => {
         <pre class="mpgh-mermaid" data-mpgh-mermaid-source="graph TD\n    A --&gt; B">graph TD\n    A --&gt; B</pre>
         <div class="mpgh-mermaid">sequenceDiagram\n    A-&gt;&gt;B: hi</div>
     </div>`;
-    const { html, hasMermaid } = prepareMermaidHtml(body);
+    const { html, hasMermaid, hasZenuml } = prepareMermaidHtml(body);
     assert.equal(hasMermaid, true);
+    assert.equal(hasZenuml, false);
     assert.match(html, /<pre class="mpgh-mermaid" data-mpgh-mermaid-source=/);
     assert.match(html, /<div class="mpgh-mermaid">sequenceDiagram/);
+});
+
+test('prepareMermaidHtml reports zenuml documents', () => {
+    const body = `<div class="mpgh-body">
+        <pre class="mpgh-mermaid" data-mpgh-mermaid-source="zenuml\n    A.method1() { B.method2() }">zenuml\n    A.method1() { B.method2() }</pre>
+    </div>`;
+    const { hasMermaid, hasZenuml } = prepareMermaidHtml(body);
+    assert.equal(hasMermaid, true);
+    assert.equal(hasZenuml, true);
 });

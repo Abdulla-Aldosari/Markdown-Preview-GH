@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as esbuild from 'esbuild';
-import { STATIC_STYLESHEETS, copyMermaidLibrary, copyStaticStylesheets, createBuildOptions } from '../build/bundle.mts';
+import { STATIC_STYLESHEETS, copyExportLibraries, copyMermaidLibrary, copyStaticStylesheets, createBuildOptions } from '../build/bundle.mts';
 
 /**
  * Builds every runtime bundle in memory and returns the output text keyed
@@ -81,20 +81,32 @@ test('copyMermaidLibrary publishes the official ESM entry with its chunks', asyn
     }
 });
 
-test('the Mermaid export bundle is a classic script carrying the renderer logic', async () => {
+test('the Mermaid export bootstrap is a small classic script reading the UMD namespace', async () => {
     const code = (await buildInMemory(false)).get('mermaid-export.js');
     assert.ok(code);
     assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
-    // The IIFE closes before the combined legal comment block esbuild appends
-    // for the bundled third-party libraries.
     assert.match(code, /\}\)\(\);\n/);
     assert.doesNotMatch(code, /^\s*(import|export)\s/m);
     assert.match(code, /MPGH_EXPORT/, 'the export page options must survive bundling');
+    assert.match(code, /__esbuild_esm_mermaid_nm/, 'the bootstrap must read the UMD namespace');
     assert.match(code, /pre\.mermaid, div\.mermaid, pre\.mpgh-mermaid, div\.mpgh-mermaid/, 'the placeholder selector must survive bundling');
     assert.match(code, /mpgh-export-diagram-print/, 'the print copy wrapper must survive bundling');
-    // The bundle must carry both engines: Mermaid itself and the standalone
-    // ZenUML library with its own copy of the Mermaid runtime.
-    assert.ok(code.length > 2_000_000, 'the export bundle must carry the libraries');
+    assert.ok(code.length < 100_000, 'the bootstrap must not bundle the libraries');
+});
+
+test('copyExportLibraries copies the official minified UMD builds verbatim', () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-export-libs-'));
+    try {
+        copyExportLibraries(outDir);
+        const mermaidSource = fs.readFileSync(new URL('../node_modules/mermaid/dist/mermaid.min.js', import.meta.url));
+        assert.ok(fs.readFileSync(path.join(outDir, 'mermaid.min.js')).equals(mermaidSource), 'mermaid.min.js');
+        const zenumlSource = fs.readFileSync(new URL('../node_modules/@mermaid-js/mermaid-zenuml/dist/mermaid-zenuml.min.js', import.meta.url));
+        assert.ok(fs.readFileSync(path.join(outDir, 'zenuml.min.js')).equals(zenumlSource), 'zenuml.min.js');
+        assert.ok(mermaidSource.length > 3_000_000, 'the minified Mermaid build must be the full library');
+        assert.ok(zenumlSource.length > 3_000_000, 'the minified zenuml build must carry its own library copy');
+    } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+    }
 });
 
 test('copyStaticStylesheets copies every hand-written stylesheet byte for byte', () => {
