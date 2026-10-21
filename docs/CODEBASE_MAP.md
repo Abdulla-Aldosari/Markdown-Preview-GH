@@ -271,20 +271,24 @@ dependency is upgraded.
 
 ### preview/mermaid-export.mts
 
-The export renderer, bundled by the build into one classic script (IIFE)
-`dist/mermaid-export.js` carrying the whole Mermaid library and the
-zenuml plugin. The export command bakes it inline into the exported
-page, which runs it inside the browser it was opened in - no temporary
-webview exists anymore. It matches both `mermaid` and the reclassified
-`mpgh-mermaid` placeholders, reads each source from
-`data-mpgh-mermaid-source`, registers the zenuml plugin on Mermaid so
-zenuml renders through the same API as every other diagram type, reads
-the pinned `data-theme-mode` from the `.mpgh-body` wrapper, initializes
-Mermaid with the fallback website theme for that brightness, injects the
-per-diagram theme directive into every non-zenuml placeholder exactly
-like the live preview does, and replaces each placeholder with its
-rendered SVG (leaving failed diagrams as code blocks). Dark pages render
-each diagram twice: a dark copy shown on screen and a light copy
+The export bootstrap, a small classic script (IIFE)
+`dist/mermaid-export.js` (~10 KB). The export command bakes it inline
+into the exported page together with the official minified UMD builds
+(`dist/mermaid.min.js`, and `dist/zenuml.min.js` only for zenuml
+documents), which expose themselves on the
+`window.__esbuild_esm_mermaid_nm` namespace (`{ default: api }` slots
+the bootstrap unwraps). It runs inside the browser the page was opened
+in - no temporary webview exists anymore. It matches both `mermaid`
+and the reclassified `mpgh-mermaid` placeholders, reads each source
+from `data-mpgh-mermaid-source`, registers the zenuml plugin on
+Mermaid so zenuml renders through the same API as every other diagram
+type, reads the pinned `data-theme-mode` from the `.mpgh-body`
+wrapper, initializes Mermaid with the fallback website theme for that
+brightness, injects the per-diagram theme directive into every
+non-zenuml placeholder exactly like the live preview does, and
+replaces each placeholder with its rendered SVG (leaving failed
+diagrams as code blocks). Dark pages render each diagram twice: a
+dark copy shown on screen and a light copy
 (`.mpgh-export-diagram-print`) revealed only by the print stylesheet.
 The page shows a themed waiting overlay (spinner + Please Wait) until
 rendering finishes; when the command was `Print...` the bundle calls
@@ -431,9 +435,13 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   the same file runs in the desktop and the web extension host.
 - `dist/mermaid-preview.js` - the preview script as a small IIFE classic
   script.
-- `dist/mermaid-export.js` - the whole Mermaid library plus the zenuml
-  plugin as one classic script (IIFE), baked inline into exported pages
-  that contain diagrams.
+- `dist/mermaid-export.js` - the small export bootstrap (IIFE classic
+  script) baked inline into exported pages that contain diagrams.
+- `dist/mermaid.min.js` - the official minified UMD build of the whole
+  Mermaid library, baked inline into exported pages that contain
+  diagrams.
+- `dist/zenuml.min.js` - the official minified UMD build of the zenuml
+  plugin, baked inline only into exported pages that contain zenuml.
 - `dist/zenuml.js` - a standalone ES module carrying Mermaid plus the
   zenuml diagram definition, loaded lazily by the preview only when a
   zenuml block exists.
