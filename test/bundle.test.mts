@@ -67,6 +67,18 @@ test('the preview script bundle is a small classic script without the Mermaid li
     assert.ok(code.length < 50_000, 'the preview script must stay small');
 });
 
+test('the image viewer bundle is a small classic script that owns the click and the layer', async () => {
+    const code = (await buildInMemory(false)).get('image-viewer.js');
+    assert.ok(code);
+    assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
+    assert.match(code, /\n\}\)\(\);\n/);
+    assert.doesNotMatch(code, /^\s*(import|export)\s/m);
+    assert.match(code, /mpgh-viewer/, 'the layer class must survive bundling');
+    assert.match(code, /mpghViewer/, 'the context key of the preview menu must survive bundling');
+    assert.match(code, /\.mpgh-mermaid\[data-mpgh-rendered=/, 'the rendered diagram selector must survive bundling');
+    assert.ok(code.length < 60_000, 'the viewer script must stay small');
+});
+
 test('copyMermaidLibrary publishes the official ESM entry with its chunks', async () => {
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-mermaid-copy-'));
     try {

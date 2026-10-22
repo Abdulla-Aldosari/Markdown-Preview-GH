@@ -37,14 +37,16 @@
   "contributes": {
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
-      "./dist/mermaid-preview.js"
+      "./dist/mermaid-preview.js",
+      "./dist/image-viewer.js"
     ],
     "markdown.previewStyles": [
       "./dist/overrides.css",
       "./dist/preview-base.css",
       "./dist/theme-light.css",
       "./dist/theme-dark.css",
-      "./dist/syntax-highlighting.css"
+      "./dist/syntax-highlighting.css",
+      "./dist/image-viewer.css"
     ],
     "configuration": {
       "title": "Markdown Preview GH",
@@ -179,37 +181,37 @@
       "webview/context": [
         {
           "command": "markdown-preview-gh.openInBrowser",
-          "when": "webviewId == 'markdown.preview' && !isWeb",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",
           "group": "z_gmpExport@1"
         },
         {
           "command": "markdown-preview-gh.print",
-          "when": "webviewId == 'markdown.preview' && !isWeb",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",
           "group": "z_gmpExport@2"
         },
         {
           "command": "markdown-preview-gh.setContentWidth",
-          "when": "webviewId == 'markdown.preview'",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer",
           "group": "z_gmpPrefs@1"
         },
         {
           "command": "markdown-preview-gh.setContentDirection",
-          "when": "webviewId == 'markdown.preview'",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer",
           "group": "z_gmpPrefs@2"
         },
         {
           "command": "markdown-preview-gh.setColorMode",
-          "when": "webviewId == 'markdown.preview'",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer",
           "group": "z_gmpPrefs@3"
         },
         {
           "command": "markdown-preview-gh.resetPreferences",
-          "when": "webviewId == 'markdown.preview'",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer",
           "group": "z_gmpPrefs@4"
         },
         {
           "command": "markdown-preview-gh.openFileOnGitHub",
-          "when": "webviewId == 'markdown.preview' && !isWeb && markdownPreviewGh.isGitHubRepo",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb && markdownPreviewGh.isGitHubRepo",
           "group": "z_gmpSource@1"
         }
       ]

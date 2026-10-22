@@ -14,11 +14,12 @@ The extension hooks into the built-in preview through three contribution
 points in `package.json`:
 
 - `markdown.previewStyles` - stylesheets VS Code injects into every preview
-  (`overrides.css`, `preview-base.css`, the theme files, and the syntax
-  highlighting theme).
+  (`overrides.css`, `preview-base.css`, the theme files, the syntax
+  highlighting theme, and `image-viewer.css`).
 - `markdown.previewScripts` - `dist/mermaid-preview.js`, a small classic
   script that runs inside the preview webview and loads the Mermaid
-  library lazily from `dist/mermaid/` (see the preview script section).
+  library lazily from `dist/mermaid/` (see the preview script section),
+  and `dist/image-viewer.js`, the zoomable viewer of images and diagrams.
 - `markdown.markdownItPlugins` - lets `activate` return an
   `extendMarkdownIt(markdownIt)` function that receives the preview's Markdown-it
   instance.
@@ -237,6 +238,51 @@ flicker unchanged diagrams. It:
 - honours an explicit `markdown.mermaid.*` theme choice (anything but
   `vscode`), which replaces the per-diagram injection entirely.
 
+### preview/image-viewer.mts
+
+The zoomable viewer, bundled into the classic script (IIFE)
+`dist/image-viewer.js` (`markdown.previewScripts`). One viewer serves both
+content types: a click on an image (`.mpgh-content img`) or on the drawing
+of a rendered diagram (`.mpgh-mermaid[data-mpgh-rendered="1"]`) opens it.
+Nothing is added to the document content; the layer is created on click,
+appended to `document.body` (outside the `.markdown-body` the preview
+replaces on every update), and removed on close. It:
+
+- opens with a click, except for images inside links, icon-sized content,
+  clicks with a modifier key, and clicks that end a text selection,
+- shows a copy of the content at its natural size and positions it with a
+  single `translate() scale()` transform: an `<img>` with the same source
+  for images, a clone of the SVG for diagrams (the ids of the clone get a
+  suffix so its markers never resolve through the hidden original),
+- animates the open and close between the clicked element and the fitted
+  view (a content-fit transform of the element's rectangle); content whose
+  source is off screen fades, and `prefers-reduced-motion` disables every
+  transition,
+- fits raster images without enlarging them past their pixels and lets
+  vector content (diagrams, SVG files) enlarge up to 4x while fitting;
+  the zoom range is the fit up to 800%,
+- zooms with the wheel and the trackpad pinch (a `ctrl` wheel) around the
+  pointer, with a two-finger pinch that also pans, with the toolbar buttons,
+  and with `+` / `-` / `0` / `1`; pans by dragging and with the arrow keys;
+  toggles between the fit and the actual size on a double click (the
+  event does not propagate, because the preview's own double click handler
+  would otherwise jump to the editor),
+- closes with `Esc`, the close button, or a click on the backdrop that is
+  not the end of a drag,
+- carries `data-theme-mode` of the preview wrapper, so the theme variables
+  color the layer, and keeps its keyboard focus on the toolbar buttons
+  (dialog semantics, focus restored on close),
+- marks the layer with `data-vscode-context='{"mpghViewer":true}'`, which
+  hides the extension's entries from the preview's context menu,
+- writes the zoom label to a `data-label` attribute instead of text, so
+  its updates never wake the Mermaid script's DOM observer.
+
+The decisions live in two pure modules: `preview/viewer-eligibility.mts`
+(`canOpenViewer`, `isZoomableSubject`, `isVectorImageSource`) and
+`preview/viewer-geometry.mts` (fit, zoom around a point, pan limits, wheel
+and pinch math, the double-click target, and the rectangle transforms of
+the open and close animations).
+
 ### preview/mermaid-theme-logic.mts
 
 The pure decision logic of the preview script, with no DOM access: the host
@@ -341,6 +387,21 @@ palette block carries the light activation selectors alongside the bare
 `.mpgh-body` default, so the export print filter can flip the palette onto
 the dark selectors at print time.
 
+### image-viewer.css
+
+The stylesheet of the viewer layer: the backdrop, the stage, the content,
+the toolbar, and the open/close transitions. The layer is colored with the
+same theme variables as the preview. The script marks the layer with
+`data-kind="diagram"` or `data-kind="image"`, and the two kinds are dressed
+differently: a diagram sits on a themed card (a background plus a
+`box-shadow`), while an image has no card (its transparent pixels show the
+backdrop) and gets a `drop-shadow` filter that follows its painted pixels.
+The card of a diagram and the shadow of an image belong to the open state
+(`.is-open`) and transition, so they fade in while the content flies out and
+fade out while it flies back. The zoom cursor on images and
+diagrams appears only after the viewer script ran, and the layer is hidden
+when printing. The export page never loads it.
+
 ### Naming scheme
 
 The extension's own DOM hooks use the `mpgh` prefix (classes
@@ -443,6 +504,8 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   the same file runs in the desktop and the web extension host.
 - `dist/mermaid-preview.js` - the preview script as a small IIFE classic
   script.
+- `dist/image-viewer.js` - the zoomable viewer script as a small IIFE
+  classic script.
 - `dist/mermaid-export.js` - the small export bootstrap (IIFE classic
   script) baked inline into exported pages that contain diagrams.
 - `dist/mermaid.min.js` - the official minified UMD build of the whole
@@ -494,8 +557,13 @@ Seven commands (`commands` and `webview/context` in `package.json`):
 - `openFileOnGitHub` - opens the current file on github.com.
 
 The context menu entries appear in the preview (`webviewId ==
-'markdown.preview'`); the export commands also appear in the Command Palette
-for Markdown files (desktop only).
+'markdown.preview' && !mpghViewer`); the export commands also appear in the
+Command Palette for Markdown files (desktop only). The `mpghViewer` context
+key comes from the image viewer layer (`data-vscode-context`), so none of
+these entries is offered while the pointer is over a zoomed image or diagram:
+the commands act on a document and receive no document URI from the layer.
+The built-in cut, copy, and paste entries stay. Every `webview/context`
+entry must carry `!mpghViewer`; `test/webview-context-menu.test.mts` locks it.
 
 `openFileOnGitHub` is hidden unless the context key
 `markdownPreviewGh.isGitHubRepo` is set. The extension maintains that key
@@ -552,12 +620,25 @@ One test file per module, all run with `npm test`:
   the manual-surface freshness guard, and a coverage test that locks the
   `surface.md` corpus (tags, classes, attributes) so the surface cannot
   silently shrink.
+- `test/viewer-geometry.test.mts` - the pure geometry of the viewer: fit,
+  zoom around a point, pan limits, wheel and pinch math, double-click
+  targets, and the animation rectangles.
+- `test/viewer-eligibility.test.mts` - which clicks open the viewer, and
+  vector source detection.
+- `test/webview-context-menu.test.mts` - the `webview/context` entries of
+  `package.json`: every command is listed and every entry is hidden while
+  the viewer layer is under the pointer.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the extension bundle requires
   only `vscode` and exports `activate`, the preview script and the Mermaid
   renderer are classic scripts, the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.
+- `e2e/image-viewer.spec.ts` - a UI test that opens the built-in preview
+  of `fixtures/image-viewer.md` in a real VS Code window and drives the
+  viewer: image and diagram opening, the layer's context menu (built-in
+  entries only), wheel zoom, fit reset, `Esc`, and the linked-image
+  exemption.
 - `e2e/mermaid-themes.spec.ts` - UI tests (`npm run test:e2e`) that launch
   a real VS Code window with the extension, open the built-in preview of a
   fixture covering every diagram type, and pin the computed colors of the

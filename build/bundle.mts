@@ -17,6 +17,9 @@
  *   placeholders the Markdown-it plugin reclassified to `mpgh-mermaid` and
  *   loads the vendor bundle lazily, so the preview content never waits for
  *   the heavy library.
+ * - `dist/image-viewer.js`: the zoomable viewer script, a small classic script
+ *   (IIFE) injected into the preview webview. A click on an image or a
+ *   rendered diagram opens it in a modal layer with zoom and pan.
  * - `dist/mermaid-preview-vendor.js`: the whole Mermaid library as a classic
  *   script (IIFE) exposing `window.MermaidVendor`. Loaded on demand by the
  *   preview script, only when diagrams exist.
@@ -43,7 +46,7 @@ import * as esbuild from 'esbuild';
 const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Hand-written stylesheets copied verbatim into `dist/`. */
-export const STATIC_STYLESHEETS: readonly string[] = ['overrides.css', 'syntax-highlighting.css'];
+export const STATIC_STYLESHEETS: readonly string[] = ['overrides.css', 'syntax-highlighting.css', 'image-viewer.css'];
 
 export interface BundleOptions {
     /** Minify and omit source maps. */
@@ -76,6 +79,13 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
             ...shared,
             entryPoints: [path.join(rootDir, 'src', 'preview', 'mermaid-preview.mts')],
             outfile: path.join(outDir, 'mermaid-preview.js'),
+            format: 'iife',
+            platform: 'browser',
+        },
+        {
+            ...shared,
+            entryPoints: [path.join(rootDir, 'src', 'preview', 'image-viewer.mts')],
+            outfile: path.join(outDir, 'image-viewer.js'),
             format: 'iife',
             platform: 'browser',
         },
