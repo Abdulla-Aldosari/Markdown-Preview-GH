@@ -1,0 +1,242 @@
+/*
+ * The zoomable viewer of images and Mermaid diagrams. The layer is created
+ * on demand by dist/image-viewer.js and appended to the body; the colors come
+ * from the same theme variables the preview uses (the layer carries its own
+ * data-theme-mode attribute, so the theme selectors apply to it).
+ */
+
+/* The zoom cursor appears only once the script that implements the zoom runs. */
+html.mpgh-viewer-ready .mpgh-content img:not(a img),
+html.mpgh-viewer-ready .mpgh-mermaid[data-mpgh-rendered='1'] svg {
+    cursor: zoom-in;
+}
+
+/* The clicked element stays in the layout while its copy flies over it. */
+.mpgh-viewer-source {
+    visibility: hidden !important;
+}
+
+.mpgh-viewer {
+    --mpgh-viewer-ms: 220ms;
+    --mpgh-viewer-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    overflow: hidden;
+    outline: none;
+    color: var(--fgColor-default, #1f2328);
+    font-family: var(--fontStack-sansSerif, system-ui, sans-serif);
+    font-size: 14px;
+}
+
+.mpgh-viewer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(1, 4, 9, 0.78);
+    opacity: 0;
+    transition: opacity var(--mpgh-viewer-ms) ease;
+}
+
+.mpgh-viewer.is-open::before {
+    opacity: 1;
+}
+
+.mpgh-viewer-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.mpgh-viewer-stage.is-dragging {
+    cursor: grabbing;
+}
+
+.mpgh-viewer-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.mpgh-viewer-content > img,
+.mpgh-viewer-content > svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0;
+    background: none;
+    cursor: inherit;
+    pointer-events: none;
+}
+
+/*
+ * A diagram sits on a themed card. The card (its surface and its shadow)
+ * belongs to the open state: it fades in while the diagram flies out and
+ * fades out while the diagram flies back, so it is gone by the time the
+ * diagram reaches the document and never pops away at the last moment.
+ */
+.mpgh-viewer[data-kind='diagram'] .mpgh-viewer-content {
+    background-color: transparent;
+    border-radius: 6px;
+    box-shadow: 0 8px 32px rgba(1, 4, 9, 0);
+}
+
+.mpgh-viewer[data-kind='diagram'].is-open .mpgh-viewer-content {
+    background-color: var(--bgColor-default, #fff);
+    box-shadow: 0 8px 32px rgba(1, 4, 9, 0.5);
+}
+
+/*
+ * An image has no card: the layer would otherwise show through its
+ * transparent pixels (rounded corners, cut-outs). The shadow follows the
+ * painted pixels instead, with the same open-state timing as the card shadow.
+ */
+.mpgh-viewer[data-kind='image'] .mpgh-viewer-content > img {
+    filter: drop-shadow(0 8px 32px rgba(1, 4, 9, 0));
+    transition: filter var(--mpgh-viewer-ms) ease;
+}
+
+.mpgh-viewer[data-kind='image'].is-open .mpgh-viewer-content > img {
+    filter: drop-shadow(0 8px 32px rgba(1, 4, 9, 0.5));
+}
+
+/*
+ * The transitions of the content: the card (surface and shadow) always, the
+ * transform while a zoom or a fly animation runs, the opacity for content
+ * whose source is off screen (it fades instead of flying). Each combination
+ * spells out its own list because a later declaration replaces the whole
+ * property; the card part is shared through one custom property.
+ */
+.mpgh-viewer {
+    --mpgh-viewer-card: background-color var(--mpgh-viewer-ms) ease, box-shadow var(--mpgh-viewer-ms) ease;
+}
+
+.mpgh-viewer-content {
+    transition: var(--mpgh-viewer-card);
+}
+
+.mpgh-viewer-content.is-animating {
+    transition:
+        transform var(--mpgh-viewer-ms) var(--mpgh-viewer-ease),
+        var(--mpgh-viewer-card);
+}
+
+.mpgh-viewer.is-fade .mpgh-viewer-content {
+    opacity: 0;
+    transition:
+        opacity var(--mpgh-viewer-ms) ease,
+        var(--mpgh-viewer-card);
+}
+
+.mpgh-viewer.is-fade.is-open .mpgh-viewer-content {
+    opacity: 1;
+}
+
+.mpgh-viewer.is-fade .mpgh-viewer-content.is-animating {
+    transition:
+        opacity var(--mpgh-viewer-ms) ease,
+        transform var(--mpgh-viewer-ms) var(--mpgh-viewer-ease),
+        var(--mpgh-viewer-card);
+}
+
+.mpgh-viewer-toolbar {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: var(--bgColor-default, #fff);
+    border: 1px solid var(--borderColor-default, #d1d9e0);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(1, 4, 9, 0.4);
+    transform: translate(-50%, 12px);
+    opacity: 0;
+    transition:
+        opacity var(--mpgh-viewer-ms) ease,
+        transform var(--mpgh-viewer-ms) var(--mpgh-viewer-ease);
+}
+
+.mpgh-viewer.is-open .mpgh-viewer-toolbar {
+    transform: translate(-50%, 0);
+    opacity: 1;
+}
+
+.mpgh-viewer-toolbar button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    margin: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.mpgh-viewer-toolbar button:hover {
+    background: var(--bgColor-neutral-muted, rgba(129, 139, 152, 0.12));
+}
+
+.mpgh-viewer-toolbar button:focus-visible {
+    outline: 2px solid var(--fgColor-accent, #0969da);
+    outline-offset: -2px;
+}
+
+.mpgh-viewer-toolbar button[aria-disabled='true'] {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.mpgh-viewer-toolbar button[aria-disabled='true']:hover {
+    background: transparent;
+}
+
+.mpgh-viewer-toolbar svg {
+    fill: currentColor;
+}
+
+/* The zoom label comes from the data attribute the script keeps current. */
+.mpgh-viewer-zoom {
+    min-width: 56px !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.mpgh-viewer-zoom::after {
+    content: attr(data-label);
+}
+
+.mpgh-viewer-separator {
+    align-self: stretch;
+    width: 1px;
+    margin: 4px 2px;
+    background: var(--borderColor-default, #d1d9e0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mpgh-viewer::before,
+    .mpgh-viewer-content,
+    .mpgh-viewer-content > img,
+    .mpgh-viewer-toolbar {
+        transition: none !important;
+    }
+}
+
+@media print {
+    .mpgh-viewer {
+        display: none !important;
+    }
+}
