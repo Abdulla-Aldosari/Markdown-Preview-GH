@@ -146,12 +146,58 @@
         "category": "Markdown Preview GH"
       },
       {
+        "command": "markdown-preview-gh.exportHtmlLight",
+        "title": "HTML Light Theme",
+        "category": "Markdown Preview GH: Export As"
+      },
+      {
+        "command": "markdown-preview-gh.exportHtmlDark",
+        "title": "HTML Dark Theme",
+        "category": "Markdown Preview GH: Export As"
+      },
+      {
+        "command": "markdown-preview-gh.exportPdf",
+        "title": "PDF",
+        "category": "Markdown Preview GH: Export As"
+      },
+      {
+        "command": "markdown-preview-gh.exportPng",
+        "title": "PNG",
+        "category": "Markdown Preview GH: Export As"
+      },
+      {
         "command": "markdown-preview-gh.openFileOnGitHub",
         "title": "Open File on GitHub",
         "category": "Markdown Preview GH"
       }
     ],
+    "submenus": [
+      {
+        "id": "markdown-preview-gh.exportAs",
+        "label": "Export As..."
+      }
+    ],
     "menus": {
+      "markdown-preview-gh.exportAs": [
+        {
+          "command": "markdown-preview-gh.exportHtmlLight",
+          "group": "1_export@1"
+        },
+        {
+          "command": "markdown-preview-gh.exportHtmlDark",
+          "group": "1_export@2"
+        },
+        {
+          "command": "markdown-preview-gh.exportPdf",
+          "when": "false",
+          "group": "1_export@3"
+        },
+        {
+          "command": "markdown-preview-gh.exportPng",
+          "when": "false",
+          "group": "1_export@4"
+        }
+      ],
       "commandPalette": [
         {
           "command": "markdown-preview-gh.setContentDirection",
@@ -176,6 +222,22 @@
         {
           "command": "markdown-preview-gh.print",
           "when": "editorLangId == markdown && !isWeb"
+        },
+        {
+          "command": "markdown-preview-gh.exportHtmlLight",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "markdown-preview-gh.exportHtmlDark",
+          "when": "editorLangId == markdown"
+        },
+        {
+          "command": "markdown-preview-gh.exportPdf",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.exportPng",
+          "when": "false"
         }
       ],
       "webview/context": [
@@ -188,6 +250,11 @@
           "command": "markdown-preview-gh.print",
           "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",
           "group": "z_gmpExport@2"
+        },
+        {
+          "submenu": "markdown-preview-gh.exportAs",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer",
+          "group": "z_gmpExport@3"
         },
         {
           "command": "markdown-preview-gh.setContentWidth",

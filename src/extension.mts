@@ -16,6 +16,8 @@ import type MarkdownIt from 'markdown-it';
 import { resolveColorMode, validColorModes } from './color-mode.mts';
 import { buildStandaloneHtml, exportFileName, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
 import { resolveDocumentUrls } from './url-resolution.mts';
+import { isUriString, prepareExportBody } from './export-body.mts';
+import type { ImageSource } from './image-embedding.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
@@ -177,6 +179,8 @@ export function activate(context: vscode.ExtensionContext): { extendMarkdownIt(m
         vscode.commands.registerCommand('markdown-preview-gh.setColorMode', setColorModeCommand),
         vscode.commands.registerCommand('markdown-preview-gh.openInBrowser', (args: unknown) => exportDocumentCommand(args, false)),
         vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true)),
+        vscode.commands.registerCommand('markdown-preview-gh.exportHtmlLight', (args: unknown) => exportHtmlCommand(args, 'light')),
+        vscode.commands.registerCommand('markdown-preview-gh.exportHtmlDark', (args: unknown) => exportHtmlCommand(args, 'dark')),
         vscode.commands.registerCommand('markdown-preview-gh.openFileOnGitHub', (args: unknown) => openFileOnGitHubCommand(args))
     );
 
@@ -663,5 +667,85 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Failed to export Markdown preview: ${message}`);
+    }
+}
+/** Reads local images through the workspace file system, on desktop and on the web. */
+const workspaceImageSource: ImageSource = {
+    async size(url: string): Promise<number> {
+        return (await vscode.workspace.fs.stat(vscode.Uri.parse(url))).size;
+    },
+    async read(url: string): Promise<Uint8Array> {
+        return vscode.workspace.fs.readFile(vscode.Uri.parse(url));
+    },
+};
+
+/**
+ * Resolves where an HTML export is written. An explicit `target` (a URI
+ * string or a file system path) skips the save dialog, which allows
+ * keybindings, tasks, and tests to export without interaction.
+ * @returns `undefined` when the user cancels the dialog.
+ */
+async function resolveExportTarget(args: unknown, source: vscode.Uri): Promise<vscode.Uri | undefined> {
+    if (args && typeof args === 'object' && 'target' in args && typeof args.target === 'string' && args.target) {
+        return isUriString(args.target) ? vscode.Uri.parse(args.target) : vscode.Uri.file(args.target);
+    }
+    const stem = (source.path.split('/').pop() || 'document').replace(/\.[^.]*$/, '');
+    return vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.joinPath(source, '..', `${stem}.html`),
+        filters: { HTML: ['html'] },
+        saveLabel: 'Export',
+    });
+}
+
+/**
+ * Exports the target document as a self-contained HTML file pinned to the
+ * given theme: local images are embedded, internet images stay links, and
+ * relative links are rewritten to work from the output folder.
+ */
+async function exportHtmlCommand(args: unknown, theme: ThemeMode): Promise<void> {
+    const ctx = extensionContext;
+    if (!ctx) {
+        return;
+    }
+    const uri = resolveTargetUri(args);
+    if (!uri) {
+        vscode.window.showErrorMessage('Open a Markdown file to use this command.');
+        return;
+    }
+    try {
+        const outputUri = await resolveExportTarget(args, uri);
+        if (!outputUri) {
+            return;
+        }
+        const document = await vscode.workspace.openTextDocument(uri);
+        const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
+        if (typeof bodyHtml !== 'string') {
+            throw new Error('The Markdown renderer did not return any HTML.');
+        }
+        const prepared = prepareMermaidHtml(bodyHtml);
+        const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
+        const css = await readPreviewStyles(ctx);
+        const displayName = uri.path.split('/').pop() || 'document';
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        const body = await prepareExportBody(prepared.html, {
+            bases:
+                uri.scheme === 'untitled'
+                    ? undefined
+                    : {
+                          documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                          workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
+                      },
+            outputDirUrl: `${vscode.Uri.joinPath(outputUri, '..').toString()}/`,
+            source: workspaceImageSource,
+        });
+        const html = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, ...scripts });
+        await vscode.workspace.fs.writeFile(outputUri, new TextEncoder().encode(html));
+        if (body.failures.length > 0) {
+            const list = body.failures.map((failure) => `${failure.url} (${failure.reason})`).join(', ');
+            vscode.window.showWarningMessage(`Exported with ${body.failures.length} image(s) kept as links: ${list}`);
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to export Markdown as HTML: ${message}`);
     }
 }

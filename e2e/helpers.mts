@@ -38,6 +38,13 @@ export interface LaunchedVscode {
  */
 const e2eVscodeVersion = process.env.MPGH_VSCODE_VERSION ?? '1.141.2';
 
+export interface LaunchOptions {
+    /** Opens this folder as the workspace instead of `e2e/fixtures`. */
+    workspaceDir?: string;
+    /** Written to the user's `keybindings.json`. */
+    keybindings?: readonly { key: string; command: string; args?: unknown }[];
+}
+
 /**
  * Launches a real VS Code window with this extension loaded and the given
  * fixture open as the active file, using a fresh user-data dir pinned to
@@ -49,7 +56,8 @@ const e2eVscodeVersion = process.env.MPGH_VSCODE_VERSION ?? '1.141.2';
  * feature yet, create it first (`e2e/fixtures/<feature>.md`) with content
  * that exercises that feature, and only then write the test against it.
  */
-export async function launchVscode(colorTheme: string, fixtureName: string): Promise<LaunchedVscode> {
+export async function launchVscode(colorTheme: string, fixtureName: string, options: LaunchOptions = {}): Promise<LaunchedVscode> {
+    const workspaceDir = options.workspaceDir ?? path.resolve(process.cwd(), 'e2e/fixtures');
     const executablePath = await downloadAndUnzipVSCode(e2eVscodeVersion);
     const userDataDir = path.join(os.tmpdir(), `mpgh-e2e-${Date.now()}-${Math.floor(Math.random() * 1e9)}`);
     fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });
@@ -70,6 +78,9 @@ export async function launchVscode(colorTheme: string, fixtureName: string): Pro
             2
         )
     );
+    if (options.keybindings) {
+        fs.writeFileSync(path.join(userDataDir, 'User', 'keybindings.json'), JSON.stringify(options.keybindings, null, 2));
+    }
     const app = await _electron.launch({
         executablePath,
         args: [
@@ -84,8 +95,8 @@ export async function launchVscode(colorTheme: string, fixtureName: string): Pro
             // Open the fixtures folder as the workspace and the chosen
             // fixture as the active file, so Quick Open can find the
             // other fixtures for tab-switch scenarios.
-            path.resolve(process.cwd(), 'e2e/fixtures'),
-            path.resolve(process.cwd(), `e2e/fixtures/${fixtureName}`),
+            workspaceDir,
+            path.join(workspaceDir, fixtureName),
         ],
         timeout: 120000,
     });
