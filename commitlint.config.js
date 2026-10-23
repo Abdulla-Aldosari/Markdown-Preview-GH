@@ -26,7 +26,24 @@ const baseScopes = [
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
-    ['mermaid-preview', 'the preview webview script and its pure decision logic: diagram theming, SVG caching, sequential rendering, and lazy library loading', ['src/preview/']],
+    [
+        'mermaid-preview',
+        'the Mermaid preview webview script and its pure decision logic: diagram theming, SVG caching, sequential rendering, lazy library loading, and the export renderer',
+        [
+            'src/preview/mermaid-diagram-theme.mts',
+            'src/preview/mermaid-export.mts',
+            'src/preview/mermaid-preview.mts',
+            'src/preview/mermaid-render-logic.mts',
+            'src/preview/mermaid-theme-logic.mts',
+            'src/preview/mermaid-theme-palettes.mts',
+            'src/preview/mermaid-zenuml.mts',
+        ],
+    ],
+    [
+        'imageViewer',
+        'the zoomable viewer of images and Mermaid diagrams in the preview: the click-to-open layer, zoom and pan geometry, eligibility rules, and its stylesheet',
+        ['src/preview/image-viewer.mts', 'src/preview/viewer-geometry.mts', 'src/preview/viewer-eligibility.mts', 'src/styles/image-viewer.css'],
+    ],
 
     // Theme pipeline (build/)
     ['palettes', 'the committed variable snapshot', ['build/palettes/']],
@@ -40,7 +57,7 @@ const baseScopes = [
     ['bundle', 'the esbuild bundling of src/ into dist/', ['build/bundle.mts']],
 
     // CSS layer
-    ['css', 'committed preview stylesheets that are not part of the theme pipeline', ['src/styles/']],
+    ['css', 'committed preview stylesheets that are not part of the theme pipeline or the image viewer', ['src/styles/overrides.css', 'src/styles/syntax-highlighting.css']],
 
     // test/
     ['tests', 'the node:test suites', ['test/']],
