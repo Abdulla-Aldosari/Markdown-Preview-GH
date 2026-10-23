@@ -75,7 +75,7 @@ export interface UrlResolutionBases {
  * reference is resolved against the document folder.
  * @returns the reference unchanged when it must not be touched.
  */
-function resolveReference(reference: string, bases: UrlResolutionBases): string {
+export function resolveDocumentReference(reference: string, bases: UrlResolutionBases): string {
     const trimmed = reference.trim();
     if (trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('//')) {
         return reference;
@@ -103,7 +103,7 @@ function resolveReference(reference: string, bases: UrlResolutionBases): string 
  * Resolves each candidate URL of a `srcset` value, keeping the descriptors.
  * @returns the value unchanged when no candidate needed resolving.
  */
-function resolveSrcset(value: string, bases: UrlResolutionBases): string {
+function resolveSrcset(value: string, resolve: (url: string) => string): string {
     const candidates: string[] = [];
     let changed = false;
     let index = 0;
@@ -129,7 +129,7 @@ function resolveSrcset(value: string, bases: UrlResolutionBases): string {
             }
             descriptor = value.slice(descriptorStart, index).trim();
         }
-        const resolved = resolveReference(url, bases);
+        const resolved = resolve(url);
         changed ||= resolved !== url;
         candidates.push(descriptor === '' ? resolved : `${resolved} ${descriptor}`);
     }
@@ -203,7 +203,7 @@ function parseStartTag(html: string, position: number): ParsedStartTag {
 }
 
 /** Rewrites the URL attributes of one start tag and returns the new tag text. */
-function rewriteStartTag(html: string, tagStart: number, name: string, parsed: ParsedStartTag, bases: UrlResolutionBases): string {
+function rewriteStartTag(html: string, tagStart: number, name: string, parsed: ParsedStartTag, rewrite: ReferenceRewriter): string {
     const single = urlAttributes[name];
     const lists = srcsetAttributes[name];
     const pieces: string[] = [];
@@ -222,7 +222,8 @@ function rewriteStartTag(html: string, tagStart: number, name: string, parsed: P
         }
         const decoded = decodeAttributeValue(html.slice(attribute.valueStart, attribute.valueEnd));
         const reference = name === 'img' && attribute.name === 'src' && originalSrc !== undefined ? originalSrc : decoded;
-        const next = isList ? resolveSrcset(decoded, bases) : resolveReference(reference, bases);
+        const site: ReferenceSite = { tag: name, attribute: attribute.name };
+        const next = isList ? resolveSrcset(decoded, (url) => rewrite(url, site)) : rewrite(reference, site);
         if (next === decoded) {
             continue;
         }
@@ -235,19 +236,26 @@ function rewriteStartTag(html: string, tagStart: number, name: string, parsed: P
     return pieces.join('');
 }
 
+/** Where a reference was found: the tag and the attribute that carry it. */
+export interface ReferenceSite {
+    tag: string;
+    attribute: string;
+}
+
 /**
- * Rewrites every relative reference in the rendered HTML to an absolute URL
- * against the given folders. In-page anchors, protocol-relative references,
- * and references that already carry a scheme are left as they are. An
- * `<img>` that carries `data-src` is resolved from that original path.
- *
- * @param bases The document and workspace folders. `undefined` (untitled or
- *        virtual documents) leaves the HTML as is.
+ * Maps a reference to its replacement. Returning the reference unchanged
+ * keeps the attribute as it is.
  */
-export function resolveDocumentUrls(html: string, bases: UrlResolutionBases | undefined): string {
-    if (bases === undefined) {
-        return html;
-    }
+export type ReferenceRewriter = (reference: string, site: ReferenceSite) => string;
+
+/**
+ * Rewrites every URL-carrying attribute of the rendered HTML through the
+ * given function. The references of `srcset` candidates are passed one at a
+ * time. An `<img>` that carries `data-src` passes that original path for its
+ * `src` attribute. The content of `<pre>`, `<code>`, `<script>`, and
+ * `<style>` is never scanned.
+ */
+export function rewriteDocumentReferences(html: string, rewrite: ReferenceRewriter): string {
     const output: string[] = [];
     let index = 0;
     while (index < html.length) {
@@ -272,7 +280,7 @@ export function resolveDocumentUrls(html: string, bases: UrlResolutionBases | un
         }
         const name = nameMatch[0].toLowerCase();
         const parsed = parseStartTag(html, tagName.lastIndex);
-        output.push(rewriteStartTag(html, tagStart, name, parsed, bases));
+        output.push(rewriteStartTag(html, tagStart, name, parsed, rewrite));
         index = parsed.end;
         if (rawContentElements.has(name)) {
             const closePattern = new RegExp(`</${name}[\\s>/]`, 'ig');
@@ -285,4 +293,19 @@ export function resolveDocumentUrls(html: string, bases: UrlResolutionBases | un
     }
     output.push(html.slice(index));
     return output.join('');
+}
+/**
+ * Rewrites every relative reference in the rendered HTML to an absolute URL
+ * against the given folders. In-page anchors, protocol-relative references,
+ * and references that already carry a scheme are left as they are. An
+ * `<img>` that carries `data-src` is resolved from that original path.
+ *
+ * @param bases The document and workspace folders. `undefined` (untitled or
+ *        virtual documents) leaves the HTML as is.
+ */
+export function resolveDocumentUrls(html: string, bases: UrlResolutionBases | undefined): string {
+    if (bases === undefined) {
+        return html;
+    }
+    return rewriteDocumentReferences(html, (reference) => resolveDocumentReference(reference, bases));
 }
