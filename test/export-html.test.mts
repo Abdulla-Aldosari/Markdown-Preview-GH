@@ -119,11 +119,10 @@ test('buildStandaloneHtml produces a light, escaped, self-contained page', () =>
         title: 'a<b>.md',
         bodyHtml: renderedBody,
         css: 'body { color: red; } </style><script>x</script>',
-        baseHref: 'file:///c%3A/docs/"x"/',
     });
     assert.match(html, /^<!DOCTYPE html>/);
     assert.match(html, /<title>a&lt;b&gt;\.md<\/title>/);
-    assert.match(html, /<base href="file:\/\/\/c%3A\/docs\/&quot;x&quot;\/">/);
+    assert.doesNotMatch(html, /<base[\s>]/, 'relative links are resolved before the page is built, never through <base>');
     assert.match(html, /<meta name="color-scheme" content="light">/);
     assert.match(html, /<body class="vscode-body vscode-light">/);
     assert.match(html, /class="mpgh-body"[^>]*data-theme-mode="light"/);

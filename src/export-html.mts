@@ -117,7 +117,6 @@ export interface StandaloneHtmlOptions {
     title: string;
     bodyHtml: string;
     css: string;
-    baseHref?: string;
     autoPrint?: boolean;
     /** The theme the page is pinned to. Defaults to `light`. */
     theme?: ThemeMode;
@@ -189,21 +188,10 @@ ${mermaidScript}
         </script>`;
 }
 
-export function buildStandaloneHtml({
-    title,
-    bodyHtml,
-    css,
-    baseHref,
-    autoPrint = false,
-    theme = 'light',
-    mermaidScript,
-    mermaidLibrary,
-    zenumlLibrary,
-}: StandaloneHtmlOptions): string {
-    const baseTag = baseHref ? `<base href="${escapeHtml(baseHref)}">` : '';
+export function buildStandaloneHtml({ title, bodyHtml, css, autoPrint = false, theme = 'light', mermaidScript, mermaidLibrary, zenumlLibrary }: StandaloneHtmlOptions): string {
     const printScript = autoPrint && !mermaidScript ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
     const mermaidHtml = mermaidScript && mermaidLibrary ? mermaidExportHtml(autoPrint, mermaidScript, mermaidLibrary, zenumlLibrary) : '';
-    return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        ${baseTag}\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n\n        /* Browsers do not print element backgrounds by default; force the\n           code-block background so printed output matches the screen. */\n        @media print {\n            .mpgh-body pre {\n                -webkit-print-color-adjust: exact;\n                print-color-adjust: exact;\n            }\n        }\n${mermaidScript ? mermaidExportCss() : ''}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
+    return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n\n        /* Browsers do not print element backgrounds by default; force the\n           code-block background so printed output matches the screen. */\n        @media print {\n            .mpgh-body pre {\n                -webkit-print-color-adjust: exact;\n                print-color-adjust: exact;\n            }\n        }\n${mermaidScript ? mermaidExportCss() : ''}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
 }
 
 /**

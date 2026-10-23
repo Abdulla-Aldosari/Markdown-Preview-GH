@@ -128,7 +128,9 @@ The extension entry point, bundled into `dist/extension.js` (`main` and
   temporary webview is ever opened. Dark pages also carry a light copy
   of every diagram and a print stylesheet that repaints the page with
   the light theme, so printing always produces light output while the
-  visible page never changes.
+  visible page never changes. The page carries no `<base>` element: the
+  rendered body goes through `resolveDocumentUrls` first, with the
+  document's folder as the base (only for `file` documents).
 
 ### markdown-plugin.mts
 
@@ -179,7 +181,7 @@ Pure helpers for the standalone export page:
   rest of the document (user content) untouched. Exports are pinned to
   `light` today; the pipeline already accepts both modes.
 - `buildStandaloneHtml(options)` - assembles the complete page: escaped
-  title, optional `<base href>`, the inline stylesheet (sanitized against
+  title, the inline stylesheet (sanitized against
   closing the `<style>` element), the theme-pinned `markdown-body` wrapper,
   the matching `color-scheme` meta and body class, an optional auto-print
   script, and an always-baked `@media print` rule forcing
@@ -201,6 +203,31 @@ Pure helpers for the standalone export page:
   other.
 - `toLocalFileUri(uri)` - maps `vscode-userdata` URIs to `file` URIs for
   opening in external applications.
+
+### url-resolution.mts
+
+Pure link resolution for the exported page (no `vscode` import).
+`resolveDocumentUrls(html, { documentDirUrl, workspaceFolderUrl })` rewrites
+the URL attributes of `img[src|srcset]`, `source[src|srcset]`, `a[href]`,
+`video[src|poster]`, and `audio[src]` with `new URL(ref, base)`, so the
+page works without a `<base>` element (which would also break every
+`#anchor`). A reference starting with `/` is a workspace-root path and
+resolves against `workspaceFolderUrl` (it stays as is when the document has
+no workspace folder); every other relative reference resolves against
+`documentDirUrl`. The engine's output for a workspace path on Windows
+(`/d:/ws/x.png`) becomes `file:///d:/ws/x.png`. An `<img>` that carries
+`data-src` is resolved from that original path and its current `src` is
+discarded, because the engine caches its tokens per document and writes
+`src` once, so `src` can already hold a preview-only
+`vscode-resource.vscode-cdn.net` URL. A tag-level
+scanner handles double-quoted, single-quoted, and unquoted values, decodes
+HTML entities before resolving and re-encodes after, and skips the content
+of `pre`, `code`, `script`, `style`, and comments. In-page anchors,
+protocol-relative references (`//host/...`), and references with a scheme
+stay untouched; a single-letter scheme is a Windows drive
+(`D:/ws/x.png` becomes `file:///D:/ws/x.png`). With an `undefined` base
+(untitled or virtual documents) the HTML is returned unchanged. `url()`
+inside inline `style` attributes is not rewritten.
 
 ### preview/mermaid-preview.mts
 
@@ -590,6 +617,9 @@ One test file per module, all run with `npm test`:
 - `test/export-html.test.mts` - `forceTheme`, `prepareMermaidHtml`,
   `buildStandaloneHtml`, `buildRendererPageHtml`, `parseRendererMessage`,
   `exportFileName`, `toLocalFileUri`, HTML escaping.
+- `test/url-resolution.test.mts` - every resolution rule: anchors,
+  relative and root paths, schemes, Windows drives, `srcset`, quoting
+  styles, entities, encoded and Arabic names, and skipped raw content.
 - `test/github-url.test.mts` - GitHub remote parsing (HTTPS, SSH, scp-like
   forms, sub-group owners), remote selection, repository-relative paths,
   blob URL building, and the untracked/ignored change-list filter with
@@ -639,6 +669,14 @@ One test file per module, all run with `npm test`:
   viewer: image and diagram opening, the layer's context menu (built-in
   entries only), wheel zoom, fit reset, `Esc`, and the linked-image
   exemption.
+- `e2e/export-links.spec.ts` - builds exported pages from the
+  `export-*.md` fixtures (markdown-it plus the real plugin, with the
+  engine's cached image rule simulated: the first render writes `src` and
+  `data-src`, with or without a resource provider) and opens them in
+  Playwright's Chromium: every local and remote image loads in both the
+  cold-cache and the preview-rendered-first case, a missing one does not,
+  `#anchor` links only change the hash, and sibling-document links point at
+  the right file. No VS Code window is needed.
 - `e2e/mermaid-themes.spec.ts` - UI tests (`npm run test:e2e`) that launch
   a real VS Code window with the extension, open the built-in preview of a
   fixture covering every diagram type, and pin the computed colors of the

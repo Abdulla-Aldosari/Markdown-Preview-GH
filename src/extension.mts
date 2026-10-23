@@ -15,6 +15,7 @@ import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
 import { resolveColorMode, validColorModes } from './color-mode.mts';
 import { buildStandaloneHtml, exportFileName, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
+import { resolveDocumentUrls } from './url-resolution.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
@@ -635,8 +636,16 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
         const css = await readPreviewStyles(ctx);
         const displayName = uri.path.split('/').pop() || 'document';
-        const baseHref = uri.scheme === 'file' ? `${vscode.Uri.joinPath(uri, '..').toString()}/` : undefined;
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: prepared.html, css, baseHref, autoPrint, theme, ...scripts });
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+        const bases =
+            uri.scheme === 'file'
+                ? {
+                      documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                      workspaceFolderUrl: workspaceFolder?.uri.scheme === 'file' ? `${workspaceFolder.uri.toString()}/` : undefined,
+                  }
+                : undefined;
+        const bodyWithUrls = resolveDocumentUrls(prepared.html, bases);
+        const html = buildStandaloneHtml({ title: displayName, bodyHtml: bodyWithUrls, css, autoPrint, theme, ...scripts });
 
         await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
         const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));

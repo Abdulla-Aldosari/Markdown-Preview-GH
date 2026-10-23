@@ -25,6 +25,7 @@ const baseScopes = [
     ['colorMode', 'resolving the active light/dark color mode', ['src/color-mode.mts']],
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
+    ['urlResolution', 'resolving relative links in the exported page to absolute URLs without a base element', ['src/url-resolution.mts']],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
     [
         'mermaid-preview',
