@@ -19,7 +19,11 @@
 //                scope has no single home file.
 const baseScopes = [
     // dist/ runtime modules
-    ['extension', 'activate()/deactivate(), command registration, context menus, and per-file preferences', ['src/extension.mts']],
+    [
+        'extension',
+        'activate()/deactivate(), command registration, context menus, and per-file preferences',
+        ['src/extension.mts', 'src/extension-desktop.mts', 'src/extension-web.mts'],
+    ],
     ['markdownPlugin', 'the Markdown-it plugin: alerts, task lists, emoji, code direction, and the render wrapper', ['src/markdown-plugin.mts']],
     ['previewSettings', 'configuration reading: theme modes and layout settings', ['src/preview-settings.mts']],
     ['colorMode', 'resolving the active light/dark color mode', ['src/color-mode.mts']],

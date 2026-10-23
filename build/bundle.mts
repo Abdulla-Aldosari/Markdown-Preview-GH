@@ -9,9 +9,12 @@
  * Bundles the TypeScript sources into the runtime files under `dist/` and
  * copies the hand-written preview stylesheets next to them.
  *
- * - `dist/extension.js`: the extension entry point (`main` and `browser` in
- *   `package.json`). A single CommonJS file with `vscode` left external,
- *   because the web extension host cannot load any other module.
+ * - `dist/extension.js`: the desktop entry point (`main` in `package.json`).
+ *   A single CommonJS file built for Node with `vscode` left external.
+ * - `dist/extension-web.js`: the web entry point (`browser` in
+ *   `package.json`). A single CommonJS file built for the browser with
+ *   `vscode` left external, because the web extension host cannot load any
+ *   other module. Node built-ins can never reach it.
  * - `dist/mermaid-preview.js`: the preview script, a small classic script
  *   (IIFE) injected into the preview webview. It renders the Mermaid
  *   placeholders the Markdown-it plugin reclassified to `mpgh-mermaid` and
@@ -69,10 +72,18 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
     return [
         {
             ...shared,
-            entryPoints: [path.join(rootDir, 'src', 'extension.mts')],
+            entryPoints: [path.join(rootDir, 'src', 'extension-desktop.mts')],
             outfile: path.join(outDir, 'extension.js'),
             format: 'cjs',
-            platform: 'neutral',
+            platform: 'node',
+            external: ['vscode'],
+        },
+        {
+            ...shared,
+            entryPoints: [path.join(rootDir, 'src', 'extension-web.mts')],
+            outfile: path.join(outDir, 'extension-web.js'),
+            format: 'cjs',
+            platform: 'browser',
             external: ['vscode'],
         },
         {
