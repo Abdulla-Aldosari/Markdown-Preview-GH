@@ -35,25 +35,39 @@ function requiredModules(code: string): string[] {
     return [...code.matchAll(/require\(\s*["']([^"']+)["']\s*\)/g)].map((match) => match[1]);
 }
 
-test('the extension bundle is a single CommonJS file that requires only vscode', async () => {
+test('the desktop bundle is a single CommonJS file that requires only vscode and Node built-ins', async () => {
     const code = (await buildInMemory(false)).get('extension.js');
+    assert.ok(code);
+    const modules = [...new Set(requiredModules(code))];
+    assert.ok(modules.includes('vscode'), 'the bundle must load vscode');
+    for (const specifier of modules) {
+        assert.ok(specifier === 'vscode' || specifier.startsWith('node:'), `unexpected module: ${specifier}`);
+    }
+    assert.doesNotMatch(code, /^\s*import\s/m);
+    assert.match(code, /module\.exports/);
+});
+
+test('the web bundle is a single CommonJS file that requires only vscode', async () => {
+    const code = (await buildInMemory(false)).get('extension-web.js');
     assert.ok(code);
     assert.deepEqual([...new Set(requiredModules(code))], ['vscode']);
     assert.doesNotMatch(code, /^\s*import\s/m);
     assert.match(code, /module\.exports/);
 });
 
-test('the extension bundle exports activate when loaded with a vscode stand-in', async () => {
-    const code = (await buildInMemory(true)).get('extension.js');
-    assert.ok(code);
-    const module = { exports: {} as Record<string, unknown> };
-    const sandboxRequire = (specifier: string) => {
-        assert.equal(specifier, 'vscode');
-        return {};
-    };
-    vm.runInNewContext(code, { module, exports: module.exports, require: sandboxRequire });
-    assert.equal(typeof module.exports.activate, 'function');
-});
+for (const name of ['extension.js', 'extension-web.js']) {
+    test(`${name} exports activate when loaded with a vscode stand-in`, async () => {
+        const code = (await buildInMemory(true)).get(name);
+        assert.ok(code);
+        const module = { exports: {} as Record<string, unknown> };
+        const sandboxRequire = (specifier: string) => {
+            assert.equal(specifier, 'vscode');
+            return {};
+        };
+        vm.runInNewContext(code, { module, exports: module.exports, require: sandboxRequire });
+        assert.equal(typeof module.exports.activate, 'function');
+    });
+}
 
 test('the preview script bundle is a small classic script without the Mermaid library', async () => {
     const code = (await buildInMemory(false)).get('mermaid-preview.js');

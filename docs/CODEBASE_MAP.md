@@ -38,8 +38,9 @@ in the workspace state takes priority over the global mode.
 - `src/` - TypeScript sources (`*.mts`) of the extension, the preview script
   (`src/preview/`), and the hand-written stylesheets (`src/styles/`).
 - `dist/` - generated, gitignored runtime files: the esbuild bundles, the
-  copied stylesheets, and the generated theme stylesheets. `main` and
-  `browser` in `package.json` point at `dist/extension.js`.
+  copied stylesheets, and the generated theme stylesheets. `main` in
+  `package.json` points at `dist/extension.js` and `browser` at
+  `dist/extension-web.js`.
 - `build/` - TypeScript build scripts (`*.mts`): the theme pipeline, the
   bundler script, and the committed snapshot (`palettes/*.json`,
   `base-styles.css`).
@@ -106,8 +107,15 @@ same stylesheets style it unchanged.
 
 ### extension.mts
 
-The extension entry point, bundled into `dist/extension.js` (`main` and
-`browser` in `package.json`). It is the only module that imports `vscode`.
+The shared extension code. It is the only module with logic that imports
+`vscode`, and it is reached through two thin entry files that re-export
+`activate`:
+
+- `extension-desktop.mts` - bundled for Node into `dist/extension.js`
+  (`main` in `package.json`). Services that need Node built-ins are
+  injected here.
+- `extension-web.mts` - bundled for the browser into `dist/extension-web.js`
+  (`browser` in `package.json`). It never imports a Node built-in.
 
 - `activate` registers the six commands, subscribes a configuration listener
   that refreshes the preview when one of the watched setting keys
@@ -527,8 +535,10 @@ the augmentation lists here rather than in `surface.md`.
 
 Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
 
-- `dist/extension.js` - a single CommonJS file with `vscode` external, so
-  the same file runs in the desktop and the web extension host.
+- `dist/extension.js` - the desktop entry (`src/extension-desktop.mts`): a
+  single CommonJS file built for Node with `vscode` external.
+- `dist/extension-web.js` - the web entry (`src/extension-web.mts`): a
+  single CommonJS file built for the browser with `vscode` external.
 - `dist/mermaid-preview.js` - the preview script as a small IIFE classic
   script.
 - `dist/image-viewer.js` - the zoomable viewer script as a small IIFE
