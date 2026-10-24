@@ -12,6 +12,7 @@
  */
 
 import type { BrowserLookup } from './browser-locator.mts';
+import type { MachineDescription } from './machine-label.mts';
 
 export const openSettingsLabel = 'Open Settings';
 export const exportHtmlLabel = 'Export as HTML instead';
@@ -34,12 +35,20 @@ export interface FollowUpCommand {
  * Builds the notification for a failed browser lookup.
  * @param lookup A lookup that did not find a browser.
  * @param format The export that needs the browser. Only PDF offers the print-from-browser route.
+ * @param machine The machine the search ran on. A remote one is named and the message says the browser must be installed there, so it is not mistaken for the user's own computer.
  */
-export function describeMissingBrowser(lookup: Exclude<BrowserLookup, { kind: 'found' }>, format: RasterOrDocumentFormat): MissingBrowserNotice {
+export function describeMissingBrowser(
+    lookup: Exclude<BrowserLookup, { kind: 'found' }>,
+    format: RasterOrDocumentFormat,
+    machine: MachineDescription = { label: 'this computer', remote: false }
+): MissingBrowserNotice {
+    const where = machine.remote ? `on ${machine.label} (not on your local computer)` : `on ${machine.label}`;
+    const setting = 'markdown-preview-gh.export.browserPath';
+    const install = machine.remote ? 'Install one there' : 'Install one';
     const message =
         lookup.kind === 'settingMissing'
-            ? `Cannot export as ${format}: the browser set in "markdown-preview-gh.export.browserPath" was not found (${lookup.path}).`
-            : `Cannot export as ${format}: no Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) was found on this machine. Install one, or set "markdown-preview-gh.export.browserPath".`;
+            ? `Cannot export as ${format}: the browser set in "${setting}" was not found ${where} (${lookup.path}).`
+            : `Cannot export as ${format}: no Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) was found ${where}. ${install}, or set "${setting}".`;
     return { message, actions: format === 'PDF' ? [openSettingsLabel, exportHtmlLabel, openInBrowserLabel] : [openSettingsLabel, exportHtmlLabel] };
 }
 

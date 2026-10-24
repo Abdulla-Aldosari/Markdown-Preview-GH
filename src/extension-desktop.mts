@@ -15,11 +15,13 @@ import type * as vscode from 'vscode';
 import { activate as activateExtension } from './extension.mts';
 import { detectBrowser } from './headless/browser-process.mts';
 import { openHeadlessPage } from './headless/headless-export.mts';
+import { readHostInfo } from './headless/host-info.mts';
 import { startPageServer } from './page-server.mts';
 import type { DesktopServices } from './page-server-routes.mts';
 
 const services: DesktopServices = {
     servePage: (html) => startPageServer({ html }),
+    readHostInfo,
     detectBrowser,
     openHeadlessPage,
 };

@@ -22,8 +22,29 @@ test('PNG has no print-from-browser alternative', () => {
 
 test('a wrong setting is named with its path and never silently replaced', () => {
     const notice = describeMissingBrowser({ kind: 'settingMissing', path: 'D:\\gone\\chrome.exe' }, 'PDF');
-    assert.match(notice.message, /was not found \(D:\\gone\\chrome\.exe\)/);
+    assert.match(notice.message, /was not found on this computer \(D:\\gone\\chrome\.exe\)/);
     assert.doesNotMatch(notice.message, /no Chromium-based browser/);
+});
+
+test('a local window says the browser is missing on this computer', () => {
+    const message = describeMissingBrowser({ kind: 'notFound' }, 'PDF', { label: 'this computer', remote: false }).message;
+    assert.match(message, /was found on this computer\. Install one, or set/);
+    assert.doesNotMatch(message, /local computer\)|there/);
+});
+
+test('a remote window names the machine and says it is not the local computer', () => {
+    const wsl = describeMissingBrowser({ kind: 'notFound' }, 'PDF', { label: 'WSL: Ubuntu-22.04', remote: true }).message;
+    assert.equal(
+        wsl,
+        'Cannot export as PDF: no Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) was found on WSL: Ubuntu-22.04 (not on your local computer). Install one there, or set "markdown-preview-gh.export.browserPath".'
+    );
+    const ssh = describeMissingBrowser({ kind: 'notFound' }, 'PNG', { label: 'the SSH host "build-01"', remote: true }).message;
+    assert.match(ssh, /Cannot export as PNG: .* was found on the SSH host "build-01" \(not on your local computer\)\. Install one there/);
+});
+
+test('a wrong setting in a remote window names the remote machine too', () => {
+    const message = describeMissingBrowser({ kind: 'settingMissing', path: '/opt/gone' }, 'PDF', { label: 'WSL: Ubuntu-22.04', remote: true }).message;
+    assert.match(message, /was not found on WSL: Ubuntu-22\.04 \(not on your local computer\) \(\/opt\/gone\)/);
 });
 
 test('every button maps to the command it runs, for the same document', () => {

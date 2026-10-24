@@ -34,6 +34,8 @@ export interface DesktopHarnessOptions {
     cancelOnProgress?: boolean;
     /** The theme kind of the editor: 1 light, 2 dark. */
     themeKind?: number;
+    /** `vscode.env.remoteName`; omit for a local window. */
+    remoteName?: string;
 }
 
 export interface DesktopHarness {
@@ -133,7 +135,7 @@ export async function activateDesktop(options: DesktopHarnessOptions): Promise<D
             getWorkspaceFolder: () => undefined,
             fs: diskFileSystem,
         },
-        env: { remoteName: undefined, openExternal: async () => true },
+        env: { remoteName: options.remoteName, openExternal: async () => true },
     };
     const module = { exports: {} as Record<string, unknown> };
     const sandbox = {

@@ -81,6 +81,20 @@ test('a missing browser offers the three alternatives and runs the chosen one', 
     assert.equal(JSON.stringify(followUps), JSON.stringify([{ id: 'markdown-preview-gh.exportHtmlLight', args: [{ resource }] }]));
 });
 
+test('a missing browser in a local window says it is missing on this computer', async () => {
+    const harness = await activateDesktop({ browserPath: path.join(os.tmpdir(), 'mpgh-no-such-browser'), markdown: plainBody });
+    await harness.command('markdown-preview-gh.exportPdf')({ resource, target: outputPath('none.pdf') });
+    assert.match(harness.errors[0], /was not found on this computer \(/);
+    assert.doesNotMatch(harness.errors[0], /local computer\)/);
+});
+
+test('a missing browser in a WSL window names the distribution and the remote machine', async () => {
+    const harness = await activateDesktop({ browserPath: path.join(os.tmpdir(), 'mpgh-no-such-browser'), markdown: plainBody, remoteName: 'wsl' });
+    await harness.command('markdown-preview-gh.exportPdf')({ resource, target: outputPath('none.pdf') });
+    const expected = process.env['WSL_DISTRO_NAME'] ? `WSL: ${process.env['WSL_DISTRO_NAME']}` : `WSL: ${os.hostname()}`;
+    assert.ok(harness.errors[0].includes(`was not found on ${expected} (not on your local computer)`), harness.errors[0]);
+});
+
 test('a render that returns no HTML fails with one error and cleans up', { skip }, async () => {
     const harness = await activateDesktop({ browserPath, markdown: undefined as unknown as string });
     await harness.command('markdown-preview-gh.exportPdf')({ resource, target: outputPath('bad.pdf') });

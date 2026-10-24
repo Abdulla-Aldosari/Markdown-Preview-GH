@@ -22,6 +22,7 @@ import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrU
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { createBusyGuard } from './busy-guard.mts';
 import type { BrowserLookup } from './headless/browser-locator.mts';
+import { describeMachine } from './headless/machine-label.mts';
 import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
 import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
@@ -824,8 +825,9 @@ const pdfGuard = createBusyGuard();
  * Shows the notification for a missing browser and runs the action the user
  * picks.
  */
-async function reportMissingBrowser(lookup: Exclude<BrowserLookup, { kind: 'found' }>, format: 'PDF' | 'PNG', resource: vscode.Uri): Promise<void> {
-    const notice = describeMissingBrowser(lookup, format);
+async function reportMissingBrowser(lookup: Exclude<BrowserLookup, { kind: 'found' }>, format: 'PDF' | 'PNG', resource: vscode.Uri, services: DesktopServices): Promise<void> {
+    const machine = describeMachine(vscode.env.remoteName, services.readHostInfo());
+    const notice = describeMissingBrowser(lookup, format, machine);
     const choice = await vscode.window.showErrorMessage(notice.message, ...notice.actions);
     const followUp = followUpCommand(choice, resource.toString());
     if (followUp) {
@@ -855,7 +857,7 @@ async function exportPdfCommand(args: unknown): Promise<void> {
     }
     const lookup = services.detectBrowser(readConfiguration().get<string>('export.browserPath', ''));
     if (lookup.kind !== 'found') {
-        await reportMissingBrowser(lookup, 'PDF', uri);
+        await reportMissingBrowser(lookup, 'PDF', uri, services);
         return;
     }
     const release = pdfGuard.tryEnter(uri.toString());

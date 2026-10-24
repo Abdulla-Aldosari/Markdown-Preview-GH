@@ -15,6 +15,7 @@
 
 import type { BrowserLookup } from './headless/browser-locator.mts';
 import type { HeadlessPage, HeadlessPageOptions } from './headless/headless-types.mts';
+import type { HostInfo } from './headless/machine-label.mts';
 
 /** A page that is being served on the loopback interface of the extension host. */
 export interface ServedPage {
@@ -32,6 +33,8 @@ export interface ServedPage {
 export interface DesktopServices {
     /** Serves one page and returns where to find it. */
     servePage(html: string): Promise<ServedPage>;
+    /** Facts about the machine the extension host runs on, used to name it in messages. */
+    readHostInfo(): HostInfo;
     /** Looks for an installed Chromium-based browser; `configuredPath` is the `browserPath` setting. */
     detectBrowser(configuredPath: string | undefined): BrowserLookup;
     /** Opens a page in a private headless browser and waits until it is ready. */
