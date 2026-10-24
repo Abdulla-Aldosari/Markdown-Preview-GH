@@ -108,12 +108,14 @@ same stylesheets style it unchanged.
 ### extension.mts
 
 The shared extension code. It is the only module with logic that imports
-`vscode`, and it is reached through two thin entry files that re-export
+`vscode`, and it is reached through two thin entry files that export
 `activate`:
 
 - `extension-desktop.mts` - bundled for Node into `dist/extension.js`
-  (`main` in `package.json`). Services that need Node built-ins are
-  injected here.
+  (`main` in `package.json`). It wraps `activate` and injects the Node-only
+  `DesktopServices` (`servePage`, backed by `page-server.mts`).
+  `activate(context, services?)` keeps them in `desktopServices`, which is
+  `undefined` in the web bundle.
 - `extension-web.mts` - bundled for the browser into `dist/extension-web.js`
   (`browser` in `package.json`). It never imports a Node built-in.
 
@@ -255,6 +257,34 @@ completed. `url()` inside inline `style` attributes is not rewritten.
 (one call per `srcset` candidate) and `resolveDocumentReference(reference,
 bases)` resolves a single reference. `resolveDocumentUrls` is the two
 combined.
+
+### page-server-routes.mts
+
+Pure (no `vscode`, no Node import). The logic behind `Open in Browser` and
+`Print...` in remote windows: `createPageToken(randomBytes)` builds a 128-bit
+hex token from an injected random source, `pagePath` is the only served path
+(`/<token>/index.html`), `matchPageRoute` accepts exactly that path (a query
+string is ignored), and `chooseOpenMode(remoteName, canServe)` returns `file`
+in a local window, `served` in a remote window with the server injected, and
+`unsupported` otherwise. It also declares `ServedPage` and `DesktopServices`.
+
+### page-server.mts
+
+Desktop bundle only (imports `node:http` and `node:crypto`).
+`startPageServer({ html })` listens on `127.0.0.1` on a random port and serves
+the one page: `GET` and `HEAD` for the token path answer `200` with
+`no-store` and `nosniff`, every other path answers `404`, other methods
+`405`. It stops itself 60 seconds after it starts when nobody fetched the
+page, 30 seconds after the last fetch, and on `dispose`. `closed` settles
+when it has stopped.
+
+In a remote window `exportDocumentCommand` renders the page like the local
+path, but prepares the body with `prepareExportBody` (images embedded, links
+as written, `//host` completed; a `file:///` link would name the wrong
+machine), serves it, maps the address with `vscode.env.asExternalUri` (which
+forwards the port), opens it with `openExternal`, and registers `dispose` in
+`context.subscriptions`. A failed mapping or open disposes the server and
+shows an error. Nothing is written to the remote disk.
 
 ### image-embedding.mts
 
@@ -674,6 +704,15 @@ One test file per module, all run with `npm test`:
   styles, entities, encoded and Arabic names, and skipped raw content.
 - `test/image-embedding.test.mts` - MIME mapping, embeddable schemes, the
   size cap, de-duplication, failures, and base64 equality with `Buffer`.
+- `test/page-server-routes.test.mts` - token encoding and uniqueness, exact
+  route matching, and the local, served, and unsupported open modes.
+- `test/page-server.test.mts` - real HTTP requests to the server: headers,
+  `HEAD`, `404` and `405`, random tokens, both timeouts, and `dispose`.
+- `test/remote-open.test.mts` - the real desktop bundle activated against a
+  remote-window stand-in: the page is served and opened through the mapped
+  address, links stay as written, no `file://` leaks, `Print...` prints, the
+  server stops on deactivation, mapping and open failures are reported, and
+  a local window never starts the server.
 - `test/export-body.test.mts` - the whole body preparation: embedding,
   `data-src`, `srcset`, missing images, links left as written, independence
   from the save folder, and code samples.
@@ -720,7 +759,8 @@ One test file per module, all run with `npm test`:
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
-  `vscode`, both export `activate`, the preview script and the Mermaid
+  `vscode`, only the desktop bundle contains the page server, both export
+  `activate`, the preview script and the Mermaid
   renderer are classic scripts, the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.
