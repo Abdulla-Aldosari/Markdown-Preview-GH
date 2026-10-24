@@ -61,13 +61,17 @@ export function detectBrowser(configuredPath: string | undefined): BrowserLookup
 /**
  * The launch arguments. `--edge-skip-compat-layer-relaunch` stops Edge from
  * re-launching itself through its compatibility layer, which makes the first
- * process exit at once and closes the pipe.
+ * process exit at once and closes the pipe. `--password-store=basic` stops
+ * Chrome on Linux from asking the desktop's secret service for a keyring: with
+ * the default it creates one and the desktop shows a password dialog that
+ * blocks the export. The temporary profile stores no passwords anyway.
  */
 export function buildBrowserArguments(profileDirectory: string): string[] {
     return [
         '--headless=new',
         '--remote-debugging-pipe',
         '--edge-skip-compat-layer-relaunch',
+        '--password-store=basic',
         '--no-first-run',
         '--disable-extensions',
         '--disable-gpu',

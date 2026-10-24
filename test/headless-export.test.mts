@@ -38,6 +38,7 @@ test('the launch arguments carry the pipe, the Edge relaunch guard, and the prof
     const args = buildBrowserArguments('/tmp/profile');
     assert.ok(args.includes('--remote-debugging-pipe'));
     assert.ok(args.includes('--edge-skip-compat-layer-relaunch'));
+    assert.ok(args.includes('--password-store=basic'), 'no keyring dialog on Linux desktops');
     assert.ok(args.includes('--headless=new'));
     assert.ok(args.includes('--user-data-dir=/tmp/profile'));
 });
