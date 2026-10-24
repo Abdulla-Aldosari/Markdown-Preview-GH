@@ -5,6 +5,7 @@ node_modules
 .mindstream/
 .vsenv/
 .vscode-test/
+.vscode-test-web/
 dist/
 *.vsix
 build/theme-audit/manual-surface.html
