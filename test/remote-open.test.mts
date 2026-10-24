@@ -58,6 +58,7 @@ interface Harness {
     warnings: string[];
     infos: string[];
     infoChoice: string | undefined;
+    infoItems: string[][];
     progressTitles: string[];
     mapped: string[];
     written: string[];
@@ -69,6 +70,7 @@ interface WindowOptions {
     remoteName?: string;
     openResult?: boolean;
     mapFails?: boolean;
+    failWrite?: boolean;
 }
 
 let desktopBundle: Promise<string> | undefined;
@@ -123,6 +125,7 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
             },
             showInformationMessage: (message: string, ...items: string[]) => {
                 harness.infos.push(message);
+                harness.infoItems.push(items);
                 return Promise.resolve(items.includes(harness.infoChoice ?? '') ? harness.infoChoice : undefined);
             },
             showWarningMessage: (message: string) => {
@@ -140,6 +143,9 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
             fs: {
                 readFile: async () => new TextEncoder().encode(manifest),
                 writeFile: async (uri: FakeUri) => {
+                    if (options.failWrite) {
+                        throw new Error('disk full');
+                    }
                     harness.written.push(uri.toString());
                 },
                 createDirectory: async () => undefined,
@@ -173,6 +179,7 @@ async function activateWindow(options: WindowOptions): Promise<Harness> {
         warnings: [],
         infos: [],
         infoChoice: undefined,
+        infoItems: [],
         progressTitles: [],
         mapped: [],
         written: [],
@@ -286,48 +293,61 @@ test('a local window never starts the server or maps an address', async () => {
     }
 });
 
-test('a progress notification covers the preparation and a ready notification names the address', async () => {
-    const harness = await activateWindow({ remoteName: 'ssh-remote' });
-    try {
-        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        assert.equal(harness.progressTitles.length, 1);
-        assert.match(harness.progressTitles[0], /preparing the page/i);
-        assert.deepEqual(harness.infos, [`Page ready: ${harness.opened[0]}`]);
-    } finally {
-        stopServers(harness);
+test('Open in Browser shows only a progress bar, in a remote and in a local window', async () => {
+    for (const remoteName of ['ssh-remote', undefined]) {
+        const harness = await activateWindow({ remoteName });
+        try {
+            await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            assert.equal(harness.progressTitles.length, 1);
+            assert.match(harness.progressTitles[0], /preparing the page/i);
+            assert.deepEqual(harness.infos, [], 'no notification after the progress bar');
+            assert.deepEqual(harness.warnings, []);
+            assert.deepEqual(harness.errors, []);
+        } finally {
+            stopServers(harness);
+        }
     }
 });
 
-test('the Open in Browser button of the ready notification opens the page again', async () => {
-    const harness = await activateWindow({ remoteName: 'ssh-remote' });
-    try {
-        harness.infoChoice = 'Open in Browser';
-        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        assert.equal(harness.opened.length, 2);
-        assert.equal((await fetch(harness.opened[1])).status, 200);
-        assert.deepEqual(harness.errors, []);
-    } finally {
-        stopServers(harness);
-    }
-});
-
-test('the ready notification also appears in a local window and reopens the file', async () => {
+test('Export As HTML reports only the file location and offers a button that opens it', async () => {
     const harness = await activateWindow({});
-    try {
-        harness.infoChoice = 'Open in Browser';
-        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        assert.equal(harness.infos.length, 1);
-        assert.match(harness.infos[0], /^Page ready: file:\/\//);
-        assert.equal(harness.opened.length, 2);
-        assert.equal(harness.opened[1], harness.opened[0]);
-    } finally {
-        stopServers(harness);
-    }
+    harness.infoChoice = 'Open File';
+    await harness.command('markdown-preview-gh.exportHtmlLight')({ resource: documentUri, target: '/out/readme.html' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(harness.written, ['file:///out/readme.html']);
+    assert.deepEqual(harness.infos, ['Exported to /out/readme.html']);
+    assert.deepEqual(harness.warnings, [], 'images that stay links are not reported');
+    assert.deepEqual(harness.errors, []);
+    assert.deepEqual(harness.opened, ['file:///out/readme.html'], 'the button opens the file in the browser');
 });
 
+test('Export As HTML opens nothing when the notification is dismissed', async () => {
+    const harness = await activateWindow({});
+    await harness.command('markdown-preview-gh.exportHtmlDark')({ resource: documentUri, target: '/out/readme.html' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(harness.infos.length, 1);
+    assert.deepEqual(harness.opened, []);
+});
+
+test('Export As HTML in a remote window reports the location without an open button', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote' });
+    harness.infoChoice = 'Open File';
+    await harness.command('markdown-preview-gh.exportHtmlLight')({ resource: documentUri, target: '/out/readme.html' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(harness.infos, ['Exported to /out/readme.html']);
+    assert.deepEqual(harness.opened, []);
+    assert.deepEqual(harness.infoItems, [[]], 'no button is offered');
+});
+
+test('Export As HTML still reports a failed write as an error', async () => {
+    const harness = await activateWindow({ failWrite: true });
+    await harness.command('markdown-preview-gh.exportHtmlLight')({ resource: documentUri, target: '/out/readme.html' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(harness.errors.length, 1);
+    assert.match(harness.errors[0], /Failed to export Markdown as HTML/);
+    assert.deepEqual(harness.infos, []);
+});
 test('a repeated click while the page is being prepared opens nothing more', async () => {
     const harness = await activateWindow({ remoteName: 'ssh-remote' });
     try {
