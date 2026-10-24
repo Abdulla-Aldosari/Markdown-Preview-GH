@@ -13,6 +13,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { buildBrowserArguments, detectBrowser } from '../src/headless/browser-process.mts';
 import { openHeadlessPage } from '../src/headless/headless-export.mts';
+import { isolateTempDir } from './isolated-temp.mts';
+
+// Other test files run browsers in parallel; count only the profiles of this process.
+isolateTempDir();
 
 /** These tests drive the real browser installed on this machine; they are skipped when there is none. */
 const lookup = detectBrowser(process.env['MPGH_TEST_BROWSER']);

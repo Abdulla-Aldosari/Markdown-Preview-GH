@@ -196,7 +196,7 @@
         },
         {
           "command": "markdown-preview-gh.exportPdf",
-          "when": "false",
+          "when": "!isWeb",
           "group": "1_export@3"
         },
         {
@@ -240,7 +240,7 @@
         },
         {
           "command": "markdown-preview-gh.exportPdf",
-          "when": "false"
+          "when": "editorLangId == markdown && !isWeb"
         },
         {
           "command": "markdown-preview-gh.exportPng",

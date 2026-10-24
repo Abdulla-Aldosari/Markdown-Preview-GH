@@ -21,6 +21,9 @@ import type { ImageSource } from './image-embedding.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { createBusyGuard } from './busy-guard.mts';
+import type { BrowserLookup } from './headless/browser-locator.mts';
+import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
+import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
 
@@ -188,6 +191,7 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
         vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true)),
         vscode.commands.registerCommand('markdown-preview-gh.exportHtmlLight', (args: unknown) => exportHtmlCommand(args, 'light')),
         vscode.commands.registerCommand('markdown-preview-gh.exportHtmlDark', (args: unknown) => exportHtmlCommand(args, 'dark')),
+        vscode.commands.registerCommand('markdown-preview-gh.exportPdf', (args: unknown) => exportPdfCommand(args)),
         vscode.commands.registerCommand('markdown-preview-gh.openFileOnGitHub', (args: unknown) => openFileOnGitHubCommand(args))
     );
 
@@ -769,16 +773,159 @@ const workspaceImageSource: ImageSource = {
  * keybindings, tasks, and tests to export without interaction.
  * @returns `undefined` when the user cancels the dialog.
  */
-async function resolveExportTarget(args: unknown, source: vscode.Uri): Promise<vscode.Uri | undefined> {
+async function resolveExportTarget(
+    args: unknown,
+    source: vscode.Uri,
+    format: { label: string; extension: string } = { label: 'HTML', extension: 'html' }
+): Promise<vscode.Uri | undefined> {
     if (args && typeof args === 'object' && 'target' in args && typeof args.target === 'string' && args.target) {
         return isUriString(args.target) ? vscode.Uri.parse(args.target) : vscode.Uri.file(args.target);
     }
     const stem = (source.path.split('/').pop() || 'document').replace(/\.[^.]*$/, '');
     return vscode.window.showSaveDialog({
-        defaultUri: vscode.Uri.joinPath(source, '..', `${stem}.html`),
-        filters: { HTML: ['html'] },
+        defaultUri: vscode.Uri.joinPath(source, '..', `${stem}.${format.extension}`),
+        filters: { [format.label]: [format.extension] },
         saveLabel: 'Export',
     });
+}
+
+/**
+ * Renders the document and builds a standalone page pinned to a theme, with
+ * its local images embedded and its links left as written.
+ */
+async function buildEmbeddedPage(ctx: vscode.ExtensionContext, uri: vscode.Uri, theme: ThemeMode): Promise<{ html: string; hasMermaid: boolean }> {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
+    if (typeof bodyHtml !== 'string') {
+        throw new Error('The Markdown renderer did not return any HTML.');
+    }
+    const prepared = prepareMermaidHtml(bodyHtml);
+    const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
+    const css = await readPreviewStyles(ctx);
+    const displayName = uri.path.split('/').pop() || 'document';
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+    const body = await prepareExportBody(prepared.html, {
+        bases:
+            uri.scheme === 'untitled'
+                ? undefined
+                : {
+                      documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                      workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
+                  },
+        source: workspaceImageSource,
+    });
+    return { html: buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, ...scripts }), hasMermaid: prepared.hasMermaid };
+}
+
+/** Guards the PDF export so a repeated click does not start a second browser. */
+const pdfGuard = createBusyGuard();
+
+/**
+ * Shows the notification for a missing browser and runs the action the user
+ * picks.
+ */
+async function reportMissingBrowser(lookup: Exclude<BrowserLookup, { kind: 'found' }>, format: 'PDF' | 'PNG', resource: vscode.Uri): Promise<void> {
+    const notice = describeMissingBrowser(lookup, format);
+    const choice = await vscode.window.showErrorMessage(notice.message, ...notice.actions);
+    const followUp = followUpCommand(choice, resource.toString());
+    if (followUp) {
+        await vscode.commands.executeCommand(followUp.command, ...followUp.args);
+    }
+}
+
+/**
+ * Exports the target document as a PDF through an installed Chromium-based
+ * browser. The page is always light, like `Print...`. The progress
+ * notification has a Cancel button that stops the browser.
+ */
+async function exportPdfCommand(args: unknown): Promise<void> {
+    const ctx = extensionContext;
+    const services = desktopServices;
+    if (!ctx) {
+        return;
+    }
+    if (!services) {
+        vscode.window.showErrorMessage('Export as PDF is not available in this window.');
+        return;
+    }
+    const uri = resolveTargetUri(args);
+    if (!uri) {
+        vscode.window.showErrorMessage('Open a Markdown file to use this command.');
+        return;
+    }
+    const lookup = services.detectBrowser(readConfiguration().get<string>('export.browserPath', ''));
+    if (lookup.kind !== 'found') {
+        await reportMissingBrowser(lookup, 'PDF', uri);
+        return;
+    }
+    const release = pdfGuard.tryEnter(uri.toString());
+    if (!release) {
+        vscode.window.showInformationMessage('This PDF is already being exported.');
+        return;
+    }
+    try {
+        const outputUri = await resolveExportTarget(args, uri, { label: 'PDF', extension: 'pdf' });
+        if (!outputUri) {
+            return;
+        }
+        const cancelled = await vscode.window.withProgress(
+            { location: vscode.ProgressLocation.Notification, title: 'Markdown Preview GH: exporting PDF...', cancellable: true },
+            (_progress, token) => renderPdfFile(ctx, services, lookup.path, uri, outputUri, token)
+        );
+        if (!cancelled) {
+            void announceExportedFile(outputUri);
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to export Markdown as PDF: ${message}`);
+    } finally {
+        release();
+    }
+}
+
+/**
+ * Builds the light page, prints it in the browser, and writes the PDF.
+ * @returns `true` when the user cancelled; nothing is written then.
+ */
+async function renderPdfFile(
+    ctx: vscode.ExtensionContext,
+    services: DesktopServices,
+    browserPath: string,
+    uri: vscode.Uri,
+    outputUri: vscode.Uri,
+    token: vscode.CancellationToken
+): Promise<boolean> {
+    const controller = new AbortController();
+    const subscription = token.onCancellationRequested(() => controller.abort());
+    const pageUri = vscode.Uri.joinPath(ctx.globalStorageUri, `pdf-${exportFileName(uri.toString(), 'document')}`);
+    try {
+        const page = await buildEmbeddedPage(ctx, uri, 'light');
+        await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
+        await vscode.workspace.fs.writeFile(pageUri, new TextEncoder().encode(page.html));
+        const fileUri = toLocalFileUri(pageUri);
+        if (!fileUri) {
+            throw new Error(`The temporary page is not stored on the local disk: ${pageUri.toString()}`);
+        }
+        const headless = await services.openHeadlessPage({ executablePath: browserPath, url: fileUri.toString(), waitForMarker: page.hasMermaid, signal: controller.signal });
+        try {
+            await vscode.workspace.fs.writeFile(outputUri, await printPageToPdf(headless));
+        } finally {
+            await headless.dispose();
+        }
+        return false;
+    } catch (error) {
+        if (controller.signal.aborted) {
+            return true;
+        }
+        throw error;
+    } finally {
+        subscription.dispose();
+        try {
+            await vscode.workspace.fs.delete(pageUri);
+        } catch {
+            // The temporary page may not exist when the export failed early.
+        }
+    }
 }
 
 /**
@@ -824,28 +971,8 @@ async function exportHtmlCommand(args: unknown, theme: ThemeMode): Promise<void>
         if (!outputUri) {
             return;
         }
-        const document = await vscode.workspace.openTextDocument(uri);
-        const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
-        if (typeof bodyHtml !== 'string') {
-            throw new Error('The Markdown renderer did not return any HTML.');
-        }
-        const prepared = prepareMermaidHtml(bodyHtml);
-        const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
-        const css = await readPreviewStyles(ctx);
-        const displayName = uri.path.split('/').pop() || 'document';
-        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-        const body = await prepareExportBody(prepared.html, {
-            bases:
-                uri.scheme === 'untitled'
-                    ? undefined
-                    : {
-                          documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
-                          workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
-                      },
-            source: workspaceImageSource,
-        });
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, ...scripts });
-        await vscode.workspace.fs.writeFile(outputUri, new TextEncoder().encode(html));
+        const page = await buildEmbeddedPage(ctx, uri, theme);
+        await vscode.workspace.fs.writeFile(outputUri, new TextEncoder().encode(page.html));
         void announceExportedFile(outputUri);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

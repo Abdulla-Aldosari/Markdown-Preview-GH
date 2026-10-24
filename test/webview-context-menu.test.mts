@@ -48,12 +48,17 @@ test('the Export As submenu is declared once and hangs off the preview context m
     assert.equal(entries.filter((item) => item.submenu === 'markdown-preview-gh.exportAs').length, 1);
 });
 
-test('the Export As submenu lists the four formats in order, PDF and PNG hidden until they ship', () => {
+test('the Export As submenu lists the four formats in order, PDF desktop only and PNG hidden until it ships', () => {
     assert.deepEqual(
         exportEntries.map((item) => item.command),
         ['markdown-preview-gh.exportHtmlLight', 'markdown-preview-gh.exportHtmlDark', 'markdown-preview-gh.exportPdf', 'markdown-preview-gh.exportPng']
     );
-    for (const entry of exportEntries.filter((item) => item.command?.endsWith('Pdf') || item.command?.endsWith('Png'))) {
-        assert.equal(entry.when, 'false', `${entry.command} stays hidden`);
-    }
+    const byCommand = new Map(exportEntries.map((item) => [item.command, item.when]));
+    assert.equal(byCommand.get('markdown-preview-gh.exportPdf'), '!isWeb', 'PDF needs a desktop browser');
+    assert.equal(byCommand.get('markdown-preview-gh.exportPng'), 'false', 'PNG stays hidden');
+});
+
+test('the PDF command is listed in the Command Palette for Markdown files on desktop only', () => {
+    const palette = manifest.contributes.menus['commandPalette'];
+    assert.equal(palette.find((item) => item.command === 'markdown-preview-gh.exportPdf')?.when, 'editorLangId == markdown && !isWeb');
 });
