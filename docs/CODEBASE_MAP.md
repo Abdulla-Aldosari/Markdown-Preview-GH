@@ -151,7 +151,12 @@ Theme`, `PDF`, and `PNG`; the PDF and PNG items are declared but hidden
   suggests `<stem>.html` next to the Markdown file. The body goes through
   `prepareExportBody`, which only embeds local images (read through the
   injected `workspaceImageSource`); links and every other reference stay
-  exactly as written. Images that stay links raise one combined warning.
+  exactly as written. Images that stay links are not reported. After the
+  file is written an information message names its location; in a local
+  window it carries an `Open File` button that opens the file in the default
+  browser (`announceExportedFile`), in a remote window it has no button
+  because the file sits on the remote disk. Only a failed export is reported
+  as an error.
 
 ### markdown-plugin.mts
 
@@ -290,9 +295,8 @@ are not reported for this temporary page.
 `Open in Browser` and `Print...` share one flow in both window kinds:
 `exportDocumentCommand` ignores a repeated click for the same document while
 one export runs (`busy-guard.mts`), shows a progress notification during
-`prepareAndOpenPage`, and after the browser was opened shows `Page ready:
-<address>` with an `Open in Browser` button that opens the same page again
-(`announceReadyPage`; a served page reopens through a new server).
+`prepareAndOpenPage`, and then shows nothing more: the progress bar
+disappears as soon as the browser was opened.
 
 ### busy-guard.mts
 
@@ -727,9 +731,10 @@ One test file per module, all run with `npm test`:
   remote-window stand-in: the page is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the
   server stops on deactivation, mapping and open failures are reported, the
-  progress and ready notifications (with the reopen button) appear in both
-  window kinds, repeated clicks open one window, and a local window never
-  starts the server.
+  only the progress bar appears for `Open in Browser` in both window kinds,
+  repeated clicks open one window, `Export As HTML` reports only the file
+  location (with an `Open File` button locally, none remotely) and a failed
+  write as an error, and a local window never starts the server.
 - `test/export-body.test.mts` - the whole body preparation: embedding,
   `data-src`, `srcset`, missing images, links left as written, independence
   from the save folder, and code samples.
