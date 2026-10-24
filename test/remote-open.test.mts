@@ -56,6 +56,9 @@ interface Harness {
     opened: string[];
     errors: string[];
     warnings: string[];
+    infos: string[];
+    infoChoice: string | undefined;
+    progressTitles: string[];
     mapped: string[];
     written: string[];
     subscriptions: Array<{ dispose(): void }>;
@@ -96,6 +99,7 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
     return {
         Uri: FakeUri,
         ColorThemeKind: { Light: 1, Dark: 2 },
+        ProgressLocation: { Notification: 15 },
         extensions: { getExtension: () => undefined },
         commands: {
             registerCommand: (id: string, handler: (args: unknown) => unknown) => {
@@ -112,6 +116,14 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
             showErrorMessage: (message: string) => {
                 harness.errors.push(message);
                 return Promise.resolve(undefined);
+            },
+            withProgress: (progress: { title: string }, task: () => Promise<unknown>) => {
+                harness.progressTitles.push(progress.title);
+                return task();
+            },
+            showInformationMessage: (message: string, ...items: string[]) => {
+                harness.infos.push(message);
+                return Promise.resolve(items.includes(harness.infoChoice ?? '') ? harness.infoChoice : undefined);
             },
             showWarningMessage: (message: string) => {
                 harness.warnings.push(message);
@@ -159,6 +171,9 @@ async function activateWindow(options: WindowOptions): Promise<Harness> {
         opened: [],
         errors: [],
         warnings: [],
+        infos: [],
+        infoChoice: undefined,
+        progressTitles: [],
         mapped: [],
         written: [],
         subscriptions: [],
@@ -214,7 +229,7 @@ test('in a remote window the page is served, mapped, and opened through the forw
         assert.match(html, /<a href="other\.md">/, 'links stay as written');
         assert.doesNotMatch(html, /file:\/\//, 'no local file URL leaks into a served page');
         assert.doesNotMatch(html, /window\.print/);
-        assert.equal(harness.warnings.length, 1, 'the missing image is reported');
+        assert.deepEqual(harness.warnings, [], 'images that stay links are not reported for a temporary page');
         assert.equal((await fetch(new URL('/other', harness.opened[0]))).status, 404);
     } finally {
         stopServers(harness);
@@ -269,4 +284,72 @@ test('a local window never starts the server or maps an address', async () => {
     } finally {
         stopServers(harness);
     }
+});
+
+test('a progress notification covers the preparation and a ready notification names the address', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote' });
+    try {
+        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.equal(harness.progressTitles.length, 1);
+        assert.match(harness.progressTitles[0], /preparing the page/i);
+        assert.deepEqual(harness.infos, [`Page ready: ${harness.opened[0]}`]);
+    } finally {
+        stopServers(harness);
+    }
+});
+
+test('the Open in Browser button of the ready notification opens the page again', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote' });
+    try {
+        harness.infoChoice = 'Open in Browser';
+        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.equal(harness.opened.length, 2);
+        assert.equal((await fetch(harness.opened[1])).status, 200);
+        assert.deepEqual(harness.errors, []);
+    } finally {
+        stopServers(harness);
+    }
+});
+
+test('the ready notification also appears in a local window and reopens the file', async () => {
+    const harness = await activateWindow({});
+    try {
+        harness.infoChoice = 'Open in Browser';
+        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.equal(harness.infos.length, 1);
+        assert.match(harness.infos[0], /^Page ready: file:\/\//);
+        assert.equal(harness.opened.length, 2);
+        assert.equal(harness.opened[1], harness.opened[0]);
+    } finally {
+        stopServers(harness);
+    }
+});
+
+test('a repeated click while the page is being prepared opens nothing more', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote' });
+    try {
+        const command = harness.command('markdown-preview-gh.openInBrowser');
+        await Promise.all([command({ resource: documentUri }), command({ resource: documentUri }), command({ resource: documentUri })]);
+        assert.equal(harness.opened.length, 1, 'only one browser window opens');
+        assert.equal(harness.progressTitles.length, 1);
+        assert.equal(harness.infos.filter((message) => message === 'This page is already being prepared.').length, 2);
+
+        await command({ resource: documentUri });
+        assert.equal(harness.opened.length, 2, 'the document can be exported again once the first run finished');
+    } finally {
+        stopServers(harness);
+    }
+});
+
+test('a failed preparation releases the guard and offers no ready notification', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote', mapFails: true });
+    const command = harness.command('markdown-preview-gh.openInBrowser');
+    await command({ resource: documentUri });
+    await command({ resource: documentUri });
+    assert.equal(harness.errors.length, 2, 'the second attempt was not blocked');
+    assert.deepEqual(harness.infos, []);
+    stopServers(harness);
 });
