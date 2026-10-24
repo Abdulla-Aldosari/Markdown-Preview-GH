@@ -28,7 +28,7 @@ const baseScopes = [
     ['previewSettings', 'configuration reading: theme modes and layout settings', ['src/preview-settings.mts']],
     ['colorMode', 'resolving the active light/dark color mode', ['src/color-mode.mts']],
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
-    ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
+    ['exportHtml', 'standalone HTML export and browser/print commands, including the guard against repeated invocations', ['src/export-html.mts', 'src/busy-guard.mts']],
     ['urlResolution', 'resolving relative links in the exported page to absolute URLs without a base element', ['src/url-resolution.mts']],
     ['exportBody', 'preparing the body of an exported HTML file: local image embedding and its pure helpers', ['src/export-body.mts', 'src/image-embedding.mts']],
     [
