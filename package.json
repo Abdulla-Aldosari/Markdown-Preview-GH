@@ -111,6 +111,13 @@
           "order": 3,
           "description": "Enables diagnostic logging to the 'Markdown Preview GH' output channel. Useful when troubleshooting the extension.",
           "default": false
+        },
+        "markdown-preview-gh.export.browserPath": {
+          "type": "string",
+          "order": 4,
+          "scope": "machine",
+          "markdownDescription": "Full path of the Chromium-based browser (Edge, Chrome, or Chromium) used by `Export As... > PDF` and `PNG`. Leave empty to detect an installed browser automatically. In a remote window the path is on the remote machine.",
+          "default": ""
         }
       }
     },

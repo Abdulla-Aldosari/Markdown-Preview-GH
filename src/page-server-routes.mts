@@ -13,6 +13,9 @@
  * bundle; the server itself lives in `page-server.mts`.
  */
 
+import type { BrowserLookup } from './headless/browser-locator.mts';
+import type { HeadlessPage, HeadlessPageOptions } from './headless/headless-types.mts';
+
 /** A page that is being served on the loopback interface of the extension host. */
 export interface ServedPage {
     /** The port the server listens on (loopback only). */
@@ -25,10 +28,14 @@ export interface ServedPage {
     closed: Promise<void>;
 }
 
-/** The Node-only service the desktop entry point injects into the extension. */
+/** The Node-only services the desktop entry point injects into the extension. */
 export interface DesktopServices {
     /** Serves one page and returns where to find it. */
     servePage(html: string): Promise<ServedPage>;
+    /** Looks for an installed Chromium-based browser; `configuredPath` is the `browserPath` setting. */
+    detectBrowser(configuredPath: string | undefined): BrowserLookup;
+    /** Opens a page in a private headless browser and waits until it is ready. */
+    openHeadlessPage(options: HeadlessPageOptions): Promise<HeadlessPage>;
 }
 
 /** The number of random bytes behind a page token (128 bits). */

@@ -61,6 +61,15 @@ test('only the desktop bundle contains the page server', async () => {
     assert.doesNotMatch(outputs.get('extension-web.js') ?? '', /node:http|createServer/);
 });
 
+test('only the desktop bundle contains the headless browser engine', async () => {
+    const outputs = await buildInMemory(false);
+    const desktop = outputs.get('extension.js') ?? '';
+    assert.match(desktop, /node:child_process/);
+    assert.match(desktop, /--remote-debugging-pipe/);
+    const web = outputs.get('extension-web.js') ?? '';
+    assert.doesNotMatch(web, /node:child_process|remote-debugging-pipe|spawn\(/);
+});
+
 for (const name of ['extension.js', 'extension-web.js']) {
     test(`${name} exports activate when loaded with a vscode stand-in`, async () => {
         const code = (await buildInMemory(true)).get(name);
