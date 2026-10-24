@@ -322,13 +322,17 @@ them, so the web bundle never contains this code.
 - `ready-marker.mts` - pure. `readyMarkerAttribute` (`data-mpgh-ready`) is
   the attribute an exported page sets on `<html>` when its diagrams are
   drawn; `buildReadyExpression(waitForMarker)` is the expression the engine
-  evaluates (it waits for `load` and, for diagram pages, for the marker).
+  evaluates (it waits for `load` and, for diagram pages, for the marker). The
+  `MutationObserver` is created before the first check and the `load` event
+  re-runs the same check, so a marker set at any moment is seen.
 - `headless-types.mts` - the `HeadlessPageOptions` and `HeadlessPage`
   declarations shared with the injected interface.
 - `browser-process.mts` - desktop bundle only (`node:child_process`, `node:fs`,
   `node:os`, `node:path`). `detectBrowser`, `buildBrowserArguments`
   (`--headless=new --remote-debugging-pipe --edge-skip-compat-layer-relaunch
---no-first-run --disable-extensions --disable-gpu --user-data-dir=<temp>`),
+--password-store=basic --no-first-run --disable-extensions --disable-gpu
+--user-data-dir=<temp>`; `--password-store=basic` stops Chrome on Linux from
+  creating a desktop keyring, whose password dialog would block the export),
   and `startBrowserProcess`, which wires the pipes to a protocol client and
   whose `dispose` kills the process (forced after 2 seconds) and deletes the
   temporary profile.
@@ -813,7 +817,9 @@ One test file per module, all run with `npm test`:
   and a failing write.
 - `test/browser-locator.test.mts` - the setting wins and is never replaced,
   Edge before Chrome on Windows, macOS bundles, and the Linux `PATH` order.
-- `test/ready-marker.test.mts` - the readiness expression is valid JavaScript.
+- `test/ready-marker.test.mts` - the readiness expression is valid JavaScript,
+  subscribes before its first check, resolves for a page without diagrams once
+  loaded, and for a page with diagrams only once the marker is set.
 - `test/pdf-export.test.mts` - the print parameters, base64 decoding, and the
   rejection of an empty reply or of data that is not a PDF.
 - `test/missing-browser.test.mts` - the notification text and buttons per
