@@ -20,7 +20,8 @@ import { isUriString, prepareExportBody } from './export-body.mts';
 import type { ImageSource } from './image-embedding.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
-import { chooseOpenMode, type DesktopServices } from './page-server-routes.mts';
+import { createBusyGuard } from './busy-guard.mts';
+import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
 
 type CommandArgs = { resource?: string } | undefined;
@@ -640,76 +641,136 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         vscode.window.showErrorMessage('Open in Browser and Print are not available in this window.');
         return;
     }
+    const release = exportGuard.tryEnter(uri.toString());
+    if (!release) {
+        vscode.window.showInformationMessage('This page is already being prepared.');
+        return;
+    }
+    let ready: ReadyPage | undefined;
     try {
-        const document = await vscode.workspace.openTextDocument(uri);
-        const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
-        if (typeof bodyHtml !== 'string') {
-            throw new Error('The Markdown renderer did not return any HTML.');
-        }
-        const theme = exportTheme(uri.toString());
-        const prepared = prepareMermaidHtml(bodyHtml);
-        const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
-        const css = await readPreviewStyles(ctx);
-        const displayName = uri.path.split('/').pop() || 'document';
-        const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-
-        if (mode === 'served') {
-            // The page cannot be a local file here, so it is served and the
-            // port is forwarded. Links stay as written and local images are
-            // embedded: a `file:///` link would point at the wrong machine.
-            const body = await prepareExportBody(prepared.html, {
-                bases:
-                    uri.scheme === 'untitled'
-                        ? undefined
-                        : {
-                              documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
-                              workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
-                          },
-                source: workspaceImageSource,
-            });
-            const servedHtml = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, autoPrint, theme, ...scripts });
-            await openServedPage(ctx, servedHtml);
-            if (body.failures.length > 0) {
-                const list = body.failures.map((failure) => `${failure.url} (${failure.reason})`).join(', ');
-                vscode.window.showWarningMessage(`Opened with ${body.failures.length} image(s) kept as links: ${list}`);
-            }
-            return;
-        }
-
-        const bases =
-            uri.scheme === 'file'
-                ? {
-                      documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
-                      workspaceFolderUrl: workspaceFolder?.uri.scheme === 'file' ? `${workspaceFolder.uri.toString()}/` : undefined,
-                  }
-                : undefined;
-        const bodyWithUrls = resolveDocumentUrls(prepared.html, bases);
-        const html = buildStandaloneHtml({ title: displayName, bodyHtml: bodyWithUrls, css, autoPrint, theme, ...scripts });
-
-        await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
-        const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
-        await vscode.workspace.fs.writeFile(outputUri, new TextEncoder().encode(html));
-
-        const fileUri = toLocalFileUri(outputUri);
-        if (!fileUri) {
-            vscode.window.showErrorMessage(`The exported page is not stored on the local disk and cannot be opened in the browser: ${outputUri.toString()}`);
-            return;
-        }
-        const opened = await vscode.env.openExternal(fileUri);
-        if (!opened) {
-            vscode.window.showErrorMessage(`Could not open the exported page in the browser: ${fileUri.fsPath}`);
-        }
+        ready = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Markdown Preview GH: preparing the page...' }, () =>
+            prepareAndOpenPage(ctx, uri, mode, autoPrint)
+        );
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         vscode.window.showErrorMessage(`Failed to export Markdown preview: ${message}`);
+    } finally {
+        release();
+    }
+    if (ready) {
+        void announceReadyPage(ready);
     }
 }
+
+/** Guards `Open in Browser` and `Print...` so a repeated click does not queue a second export. */
+const exportGuard = createBusyGuard();
+
+/** A page that was opened in the browser and can be opened again. */
+interface ReadyPage {
+    /** The address shown to the user. */
+    address: string;
+    /** Opens the page in the browser again. */
+    open(): Promise<void>;
+}
+
+/**
+ * Tells the user the page is ready and offers to open it again. The
+ * notification never blocks the command: it is awaited only here.
+ */
+async function announceReadyPage(ready: ReadyPage): Promise<void> {
+    const openLabel = 'Open in Browser';
+    try {
+        const choice = await vscode.window.showInformationMessage(`Page ready: ${ready.address}`, openLabel);
+        if (choice === openLabel) {
+            await ready.open();
+        }
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`Failed to open the page: ${message}`);
+    }
+}
+
+/**
+ * Renders the document, builds the standalone page, and opens it in the
+ * browser: as a local file in a local window, through the page server in a
+ * remote window.
+ * @throws When the page cannot be built or opened.
+ */
+async function prepareAndOpenPage(ctx: vscode.ExtensionContext, uri: vscode.Uri, mode: OpenMode, autoPrint: boolean): Promise<ReadyPage> {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
+    if (typeof bodyHtml !== 'string') {
+        throw new Error('The Markdown renderer did not return any HTML.');
+    }
+    const theme = exportTheme(uri.toString());
+    const prepared = prepareMermaidHtml(bodyHtml);
+    const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
+    const css = await readPreviewStyles(ctx);
+    const displayName = uri.path.split('/').pop() || 'document';
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+
+    if (mode === 'served') {
+        // The page cannot be a local file here, so it is served and the
+        // port is forwarded. Links stay as written and local images are
+        // embedded: a `file:///` link would point at the wrong machine.
+        // Images that stay links are not reported: the page is temporary.
+        const body = await prepareExportBody(prepared.html, {
+            bases:
+                uri.scheme === 'untitled'
+                    ? undefined
+                    : {
+                          documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                          workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
+                      },
+            source: workspaceImageSource,
+        });
+        const servedHtml = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, autoPrint, theme, ...scripts });
+        const address = await openServedPage(ctx, servedHtml);
+        return {
+            address,
+            open: async () => {
+                await openServedPage(ctx, servedHtml);
+            },
+        };
+    }
+
+    const bases =
+        uri.scheme === 'file'
+            ? {
+                  documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                  workspaceFolderUrl: workspaceFolder?.uri.scheme === 'file' ? `${workspaceFolder.uri.toString()}/` : undefined,
+              }
+            : undefined;
+    const bodyWithUrls = resolveDocumentUrls(prepared.html, bases);
+    const html = buildStandaloneHtml({ title: displayName, bodyHtml: bodyWithUrls, css, autoPrint, theme, ...scripts });
+
+    await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
+    const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
+    await vscode.workspace.fs.writeFile(outputUri, new TextEncoder().encode(html));
+
+    const fileUri = toLocalFileUri(outputUri);
+    if (!fileUri) {
+        throw new Error(`The exported page is not stored on the local disk and cannot be opened in the browser: ${outputUri.toString()}`);
+    }
+    await openLocalFile(fileUri);
+    return { address: fileUri.toString(), open: () => openLocalFile(fileUri) };
+}
+
+/** Opens a local page in the default browser. */
+async function openLocalFile(fileUri: vscode.Uri): Promise<void> {
+    const opened = await vscode.env.openExternal(fileUri);
+    if (!opened) {
+        throw new Error(`Could not open the exported page in the browser: ${fileUri.fsPath}`);
+    }
+}
+
 /**
  * Serves the page from the extension host, maps its address for the local
  * machine (which sets up port forwarding in a remote window), and opens it in
  * the browser. The server is stopped with the extension.
+ * @returns The address the browser was sent to.
  */
-async function openServedPage(ctx: vscode.ExtensionContext, html: string): Promise<void> {
+async function openServedPage(ctx: vscode.ExtensionContext, html: string): Promise<string> {
     const services = desktopServices;
     if (!services) {
         throw new Error('The page server is not available in this window.');
@@ -722,6 +783,7 @@ async function openServedPage(ctx: vscode.ExtensionContext, html: string): Promi
         if (!opened) {
             throw new Error(`Could not open the page in the browser: ${external.toString()}`);
         }
+        return external.toString();
     } catch (error) {
         page.dispose();
         throw error;
