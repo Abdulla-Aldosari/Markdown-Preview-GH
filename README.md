@@ -76,6 +76,8 @@ These choices are remembered for the file in the current workspace, and they nev
 - **Open in Browser** - turns the rendered document into a standalone HTML page and opens it in your default browser.
 - **Print...** - does the same and opens the browser's print dialog, so you can print the document or save it as PDF.
 
+A progress notification shows while the page is prepared, and a second click on the same document during that time is ignored. In a remote window (WSL, SSH, Dev Containers) the page is served from the remote machine for a short time and opened through VS Code's port forwarding; local images are embedded and links are left as you wrote them.
+
 Both are available from the preview context menu and from the Command Palette while a Markdown file is active. The page follows the theme of your preview, and printing always produces light output. Relative images are resolved against the Markdown file's folder, and the generated page is kept in the extension's storage folder, so nothing is added to your project.
 
 > [!NOTE]
@@ -90,11 +92,11 @@ Right-click inside the preview and choose **Export As...** to save the document 
 - **HTML Light Theme** - saves the page with the light theme.
 - **HTML Dark Theme** - saves the page with the dark theme.
 
-A save dialog asks where to put the file and suggests the Markdown file's name with an `.html` extension. Both commands are also in the Command Palette while a Markdown file is active, and they work in VS Code for the Web.
+A save dialog asks where to put the file and suggests the Markdown file's name with an `.html` extension. Both commands are also in the Command Palette while a Markdown file is active, and they work in VS Code for the Web. When the file is written, a message shows where it was saved, with an **Open File** button that opens it in your browser (in a remote window the message has no button, because the file is on the remote machine).
 
 The exported file is yours to move or share, so it carries only what it can hold itself:
 
-- **Local images are embedded** in the file, so they keep working wherever you move it. An image that is missing, larger than 20 MB, or of an unknown type keeps the path you wrote, and a warning lists it.
+- **Local images are embedded** in the file, so they keep working wherever you move it. An image that is missing, larger than 20 MB, or of an unknown type keeps the path you wrote.
 - **Internet images stay links.** They load only while you are online.
 - **Links are left exactly as you wrote them.** A relative link such as `other.md` cannot know where you will keep the file, so it is not rewritten. The one exception is a link that starts with `//`, which becomes `https://`.
 

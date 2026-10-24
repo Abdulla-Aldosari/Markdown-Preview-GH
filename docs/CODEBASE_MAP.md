@@ -819,6 +819,9 @@ One test file per module, all run with `npm test`:
   (online, manual; review the `build/palettes` diff afterwards).
 - `npm run typecheck` - `tsc -p tsconfig.json` (`strict`, no emit).
 - `npm test` - every `test/**/*.test.mts` file.
+- `npm run test:web` - opens the extension in VS Code for the Web in a
+  browser (`@vscode/test-web`, manual, run `npm run build` first) to check
+  the web bundle and that the desktop-only commands are hidden.
 - `npm run package` - `vsce package` (runs `vscode:prepublish`, i.e. the
   production build, first).
 - `npm run prettier` - format the whole project with prettier.
