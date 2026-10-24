@@ -164,6 +164,13 @@ test('links to sibling documents and external pages point at the right targets',
     expect(hrefs).toContain('https://example.com/page');
 });
 
+test('a protocol-relative link points at https, never at the file protocol', async () => {
+    await page.goto(buildPage(workspaceRoot, 'export-anchors.md'));
+    const link = page.locator('a', { hasText: 'Protocol relative' });
+    expect(await link.getAttribute('href')).toBe('https://example.com/path');
+    expect(await link.evaluate((anchor) => (anchor as HTMLAnchorElement).href)).toBe('https://example.com/path');
+});
+
 test('a document without images exports without rewriting side effects', async () => {
     await page.goto(buildPage(workspaceRoot, 'export-no-images.md'));
     expect(await page.locator('img').count()).toBe(0);
