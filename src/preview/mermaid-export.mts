@@ -25,6 +25,7 @@
  */
 
 import type { MermaidConfig } from 'mermaid';
+import { readyMarkerAttribute } from '../headless/ready-marker.mts';
 import { detectDiagramType, injectThemeDirective } from './mermaid-diagram-theme.mts';
 import { buildMermaidConfig, resolveExportBrightness } from './mermaid-render-logic.mts';
 
@@ -191,6 +192,9 @@ async function main(): Promise<void> {
         // A fatal error still reveals the prepared page as code blocks.
     } finally {
         finishWaitingOverlay();
+        // Tells the headless engine the page is final, whether the diagrams
+        // were drawn or fell back to code blocks.
+        document.documentElement.setAttribute(readyMarkerAttribute, '');
     }
 }
 

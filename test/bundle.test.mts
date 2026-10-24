@@ -137,6 +137,7 @@ test('the Mermaid export bootstrap is a small classic script reading the UMD nam
     assert.match(code, /\}\)\(\);\n/);
     assert.doesNotMatch(code, /^\s*(import|export)\s/m);
     assert.match(code, /MPGH_EXPORT/, 'the export page options must survive bundling');
+    assert.match(code, /data-mpgh-ready/, 'the ready marker the headless engine waits for must survive bundling');
     assert.match(code, /__esbuild_esm_mermaid_nm/, 'the bootstrap must read the UMD namespace');
     assert.match(code, /pre\.mermaid, div\.mermaid, pre\.mpgh-mermaid, div\.mpgh-mermaid/, 'the placeholder selector must survive bundling');
     assert.match(code, /mpgh-export-diagram-print/, 'the print copy wrapper must survive bundling');
