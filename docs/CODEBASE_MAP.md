@@ -718,8 +718,9 @@ One test file per module, all run with `npm test`:
   layer is under the pointer, and the submenu holds the four formats in
   order with PDF and PNG hidden.
 - `test/preview-settings.test.mts` - the injected configuration readers.
-- `test/bundle.test.mts` - the bundle output: the extension bundle requires
-  only `vscode` and exports `activate`, the preview script and the Mermaid
+- `test/bundle.test.mts` - the bundle output: the desktop bundle requires
+  only `vscode` and `node:` built-ins, the web bundle requires only
+  `vscode`, both export `activate`, the preview script and the Mermaid
   renderer are classic scripts, the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.
