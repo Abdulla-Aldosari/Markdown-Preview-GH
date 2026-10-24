@@ -298,6 +298,49 @@ one export runs (`busy-guard.mts`), shows a progress notification during
 `prepareAndOpenPage`, and then shows nothing more: the progress bar
 disappears as soon as the browser was opened.
 
+### headless/ (browser engine for PDF and PNG)
+
+Drives an installed Chromium-based browser over the Chrome DevTools Protocol
+on `--remote-debugging-pipe` (file descriptors 3 and 4): no WebSocket and no
+npm dependency. `DesktopServices` carries `detectBrowser` and
+`openHeadlessPage` next to `servePage`; `src/extension-desktop.mts` injects
+them, so the web bundle never contains this code.
+
+- `cdp-pipe.mts` - pure. `encodeMessage` and `createFrameDecoder` implement
+  the NUL-delimited JSON framing (a message split across chunks, including
+  inside a multi-byte character, is returned once complete).
+  `createCdpClient(write)` correlates each `send(method, params, sessionId)`
+  with its response by `id`, rejects on a protocol error, ignores events, and
+  `close(reason)` rejects everything pending.
+- `browser-locator.mts` - pure, with the file system, platform, environment,
+  and `PATH` lookup injected. `locateBrowser(configuredPath, env)` returns
+  `found` (`setting` or `detected`), `settingMissing` (a filled setting is
+  never silently replaced), or `notFound`. Windows tries Edge, then Chrome,
+  then Chromium; macOS tries the `/Applications` bundles; Linux walks
+  `google-chrome`, `chromium`, `microsoft-edge` (and their variants) on
+  `PATH`.
+- `ready-marker.mts` - pure. `readyMarkerAttribute` (`data-mpgh-ready`) is
+  the attribute an exported page sets on `<html>` when its diagrams are
+  drawn; `buildReadyExpression(waitForMarker)` is the expression the engine
+  evaluates (it waits for `load` and, for diagram pages, for the marker).
+- `headless-types.mts` - the `HeadlessPageOptions` and `HeadlessPage`
+  declarations shared with the injected interface.
+- `browser-process.mts` - desktop bundle only (`node:child_process`, `node:fs`,
+  `node:os`, `node:path`). `detectBrowser`, `buildBrowserArguments`
+  (`--headless=new --remote-debugging-pipe --edge-skip-compat-layer-relaunch
+--no-first-run --disable-extensions --disable-gpu --user-data-dir=<temp>`),
+  and `startBrowserProcess`, which wires the pipes to a protocol client and
+  whose `dispose` kills the process (forced after 2 seconds) and deletes the
+  temporary profile.
+- `headless-export.mts` - desktop bundle only. `openHeadlessPage({
+executablePath, url, waitForMarker, timeoutMs, signal })` creates and
+  attaches a target (flattened session), navigates, waits for readiness, and
+  returns a `HeadlessPage` whose `send` talks to that page. A timeout
+  (default two minutes), an aborted signal, an early browser exit, or a
+  failed navigation rejects and disposes the browser.
+
+`markdown-preview-gh.export.browserPath` overrides the browser search.
+
 ### busy-guard.mts
 
 Pure (no `vscode` import). `createBusyGuard().tryEnter(key)` returns a release
@@ -669,6 +712,10 @@ Declared in `package.json` under `configuration`:
   `full` (default `normal`).
 - `markdown-preview-gh.diagnosticLogging` - boolean (default `false`):
   enables the `Markdown Preview GH` output channel for troubleshooting.
+- `markdown-preview-gh.export.browserPath` - string (default empty, machine
+  scope): the Chromium-based browser used by the PDF and PNG exports. Empty
+  means automatic detection; in a remote window the path is on the remote
+  machine.
 
 Per-file overrides (`contentDirection`, `contentWidth`, `colorMode`) live in
 `ctx.workspaceState` under the `filePreferences` key, keyed by document URI,
@@ -727,6 +774,16 @@ One test file per module, all run with `npm test`:
   route matching, and the local, served, and unsupported open modes.
 - `test/page-server.test.mts` - real HTTP requests to the server: headers,
   `HEAD`, `404` and `405`, random tokens, both timeouts, and `dispose`.
+- `test/cdp-pipe.test.mts` - NUL framing (split chunks, multi-byte split,
+  several messages), id correlation, error responses, ignored events, `close`,
+  and a failing write.
+- `test/browser-locator.test.mts` - the setting wins and is never replaced,
+  Edge before Chrome on Windows, macOS bundles, and the Linux `PATH` order.
+- `test/ready-marker.test.mts` - the readiness expression is valid JavaScript.
+- `test/headless-export.test.mts` - the launch arguments, and (skipped when no
+  browser is installed) a real browser that prints a PDF, waits for the ready
+  marker, stops on a timeout and on an aborted signal, and always deletes its
+  temporary profile; a missing executable fails clearly.
 - `test/remote-open.test.mts` - the real desktop bundle activated against a
   remote-window stand-in: the page is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the
@@ -781,8 +838,8 @@ One test file per module, all run with `npm test`:
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
-  `vscode`, only the desktop bundle contains the page server, both export
-  `activate`, the preview script and the Mermaid
+  `vscode`, only the desktop bundle contains the page server and the headless
+  engine, both export `activate`, the preview script and the Mermaid
   renderer are classic scripts, the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.

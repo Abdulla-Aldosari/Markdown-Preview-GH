@@ -36,6 +36,11 @@ const baseScopes = [
         'serving the exported page from a temporary loopback HTTP server for Open in Browser and Print in remote windows: route matching, tokens, and the Node-only server',
         ['src/page-server-routes.mts', 'src/page-server.mts'],
     ],
+    [
+        'headless',
+        'the headless browser engine behind PDF and PNG export: DevTools pipe framing, browser discovery, the ready marker, and the Node-only process and page driver',
+        ['src/headless/'],
+    ],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
     [
         'mermaid-preview',
