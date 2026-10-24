@@ -16,6 +16,21 @@ test.setTimeout(240000);
 
 const fixturesDir = path.join(__dirname, 'fixtures');
 
+/**
+ * Waits until no browser profile of the extension is left. The PDF appears
+ * before the extension has finished deleting its temporary profile, and
+ * closing the window in between would kill the extension host mid-cleanup.
+ */
+async function waitForProfileCleanup(): Promise<void> {
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+        if (!fs.readdirSync(os.tmpdir()).some((name) => name.startsWith('mpgh-browser-'))) {
+            return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+}
+
 async function waitForFile(file: string): Promise<void> {
     const deadline = Date.now() + 90000;
     while (Date.now() < deadline) {
@@ -43,6 +58,7 @@ test('Export As PDF writes a real PDF from a VS Code window, light even on a dar
         await page.keyboard.press('Control+Shift+F9');
         try {
             await waitForFile(pdfFile);
+            await waitForProfileCleanup();
         } catch (error) {
             await page.screenshot({ path: path.join(process.cwd(), 'test-results', 'export-pdf-debug.png') });
             throw error;

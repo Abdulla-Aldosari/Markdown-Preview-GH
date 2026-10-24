@@ -18,27 +18,27 @@ export const readyMarkerAttribute = 'data-mpgh-ready';
  * Builds the expression the engine evaluates in the page. It resolves once
  * the `load` event has fired and, when the page draws diagrams, once the
  * ready marker is set.
+ *
+ * The marker can be set at any moment, including between the engine's check
+ * and its subscription, so the observer is created before the first check:
+ * whichever happens first is seen, and the promise can never miss the change.
  * @param waitForMarker Whether the page carries diagrams and sets the marker.
  */
 export function buildReadyExpression(waitForMarker: boolean): string {
     return `new Promise((resolve) => {
     const root = document.documentElement;
-    const settle = () => {
-        if (!${waitForMarker} || root.hasAttribute('${readyMarkerAttribute}')) {
+    const markerSet = () => !${waitForMarker} || root.hasAttribute('${readyMarkerAttribute}');
+    const loaded = () => document.readyState === 'complete';
+    const check = () => {
+        if (loaded() && markerSet()) {
+            observer.disconnect();
+            window.removeEventListener('load', check);
             resolve(true);
-            return;
         }
-        new MutationObserver((_records, observer) => {
-            if (root.hasAttribute('${readyMarkerAttribute}')) {
-                observer.disconnect();
-                resolve(true);
-            }
-        }).observe(root, { attributes: true, attributeFilter: ['${readyMarkerAttribute}'] });
     };
-    if (document.readyState === 'complete') {
-        settle();
-    } else {
-        window.addEventListener('load', settle, { once: true });
-    }
+    const observer = new MutationObserver(check);
+    observer.observe(root, { attributes: true, attributeFilter: ['${readyMarkerAttribute}'] });
+    window.addEventListener('load', check);
+    check();
 })`;
 }
