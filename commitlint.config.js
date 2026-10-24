@@ -30,11 +30,7 @@ const baseScopes = [
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
     ['urlResolution', 'resolving relative links in the exported page to absolute URLs without a base element', ['src/url-resolution.mts']],
-    [
-        'exportBody',
-        'preparing the body of an exported HTML file: link rebasing, local image embedding, and its pure helpers',
-        ['src/export-body.mts', 'src/url-rebase.mts', 'src/image-embedding.mts'],
-    ],
+    ['exportBody', 'preparing the body of an exported HTML file: local image embedding and its pure helpers', ['src/export-body.mts', 'src/image-embedding.mts']],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
     [
         'mermaid-preview',

@@ -735,7 +735,6 @@ async function exportHtmlCommand(args: unknown, theme: ThemeMode): Promise<void>
                           documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
                           workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
                       },
-            outputDirUrl: `${vscode.Uri.joinPath(outputUri, '..').toString()}/`,
             source: workspaceImageSource,
         });
         const html = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, ...scripts });

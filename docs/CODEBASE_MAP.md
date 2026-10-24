@@ -147,9 +147,9 @@ Theme`, `PDF`, and `PNG`; the PDF and PNG items are declared but hidden
   on VS Code for the Web. An argument `{ resource, target }` skips the
   save dialog (`resolveExportTarget`); without `target`, `showSaveDialog`
   suggests `<stem>.html` next to the Markdown file. The body goes through
-  `prepareExportBody`, which resolves, embeds, and rebases every reference
-  relative to the output folder; images are read through the injected
-  `workspaceImageSource`. Images that stay links raise one combined warning.
+  `prepareExportBody`, which only embeds local images (read through the
+  injected `workspaceImageSource`); links and every other reference stay
+  exactly as written. Images that stay links raise one combined warning.
 
 ### markdown-plugin.mts
 
@@ -254,16 +254,6 @@ inside inline `style` attributes is not rewritten.
 bases)` resolves a single reference. `resolveDocumentUrls` is the two
 combined.
 
-### url-rebase.mts
-
-Pure (no `vscode` import). `rebaseReference(reference, outputDirUrl)`
-rewrites an absolute URL as a path relative to the folder an exported file is
-written to (`a.md`, `sub/a.md`, `../a.md`), keeping the query and fragment and
-the original percent-encoding. It works on URLs, so it serves every scheme and
-virtual file systems. The reference stays absolute for another scheme or
-host and for another drive; anything that is not an absolute URL (anchors,
-relative paths) is returned unchanged.
-
 ### image-embedding.mts
 
 Pure (no `vscode` import, no `Buffer`). `loadImages(urls, source, maxBytes)`
@@ -276,12 +266,15 @@ in chunks.
 
 ### export-body.mts
 
-Pure (no `vscode` import). `prepareExportBody(html, { bases, outputDirUrl,
-source })` resolves every reference, embeds the local image sources
-(`img[src|srcset]`, `source[srcset]`) as data URIs, and rebases every other
-reference to the output folder. Internet and `data:` images stay as they are,
-and a link is never embedded even when it points at an image file.
-`isUriString` tells a URI argument from a file system path.
+Pure (no `vscode` import). `prepareExportBody(html, { bases, source })`
+resolves each image reference only to find the file, and embeds the local
+image sources (`img[src|srcset]`, `source[srcset]`) as data URIs. Every
+other reference is returned exactly as written: links (`<a href>`, even to an
+image file), internet and `data:` images, and images that could not be
+embedded. An image that cannot be embedded gets its original path back
+(`data-src` wins over a preview-only `src`). The final place of the file is
+unknown, so no link is resolved for it. `isUriString` tells a URI argument
+from a file system path.
 
 ### preview/mermaid-preview.mts
 
@@ -676,12 +669,11 @@ One test file per module, all run with `npm test`:
 - `test/url-resolution.test.mts` - every resolution rule: anchors,
   relative and root paths, schemes, Windows drives, `srcset`, quoting
   styles, entities, encoded and Arabic names, and skipped raw content.
-- `test/url-rebase.test.mts` - same, child, and parent folders, drives and
-  case, schemes and hosts, virtual file systems, and encoded names.
 - `test/image-embedding.test.mts` - MIME mapping, embeddable schemes, the
   size cap, de-duplication, failures, and base64 equality with `Buffer`.
 - `test/export-body.test.mts` - the whole body preparation: embedding,
-  `data-src`, `srcset`, missing images, link rebasing, and code samples.
+  `data-src`, `srcset`, missing images, links left as written, independence
+  from the save folder, and code samples.
 - `test/github-url.test.mts` - GitHub remote parsing (HTTPS, SSH, scp-like
   forms, sub-group owners), remote selection, repository-relative paths,
   blob URL building, and the untracked/ignored change-list filter with
@@ -745,7 +737,8 @@ One test file per module, all run with `npm test`:
   to the `Export As...` HTML commands with `{ resource, target }`: it presses
   them, then opens the written files in Playwright's Chromium and checks the
   pinned theme, embedded local images (including `srcset`), the remote image
-  kept as a link, the missing image, and the anchors and sibling links.
+  kept as a link, the missing image keeping its written path, and links left
+  as written when the file is saved at a different folder depth.
 - `e2e/mermaid-themes.spec.ts` - UI tests (`npm run test:e2e`) that launch
   a real VS Code window with the extension, open the built-in preview of a
   fixture covering every diagram type, and pin the computed colors of the
