@@ -343,9 +343,16 @@ executablePath, url, waitForMarker, timeoutMs, signal })` creates and
   `preferCSSPageSize`, no header or footer) and `printPageToPdf(page)`, which
   sends `Page.printToPDF`, decodes the payload, and rejects an empty reply or
   data that does not start with `%PDF-`.
-- `missing-browser.mts` - pure. `describeMissingBrowser(lookup, format)` builds
-  the error text (a wrong `browserPath` is named with its path) and the
-  buttons: `Open Settings`, `Export as HTML instead`, and, for PDF only,
+- `machine-label.mts` - pure. `describeMachine(remoteName, host)` names the
+  machine the extension runs on (`this computer`, `WSL: <distribution>`, the
+  SSH host, container, Codespace, or tunnel machine, by host name) and says
+  whether it is remote. `host-info.mts` (desktop bundle only) reads the host
+  name and `WSL_DISTRO_NAME`; it is injected as `readHostInfo`.
+- `missing-browser.mts` - pure. `describeMissingBrowser(lookup, format,
+machine)` builds the error text: it says where the search ran, and for a
+  remote machine adds `(not on your local computer)` and `Install one there`,
+  so it is not mistaken for the user's own computer (a wrong `browserPath` is
+  named with its path too). Its buttons: `Open Settings`, `Export as HTML instead`, and, for PDF only,
   `Open in Browser (then Save as PDF)`. `followUpCommand(label, resource)`
   maps a button to the command it runs for the same document.
 
@@ -810,7 +817,10 @@ One test file per module, all run with `npm test`:
 - `test/pdf-export.test.mts` - the print parameters, base64 decoding, and the
   rejection of an empty reply or of data that is not a PDF.
 - `test/missing-browser.test.mts` - the notification text and buttons per
-  format, a wrong setting named with its path, and the button-to-command map.
+  format, the local and remote wording, a wrong setting named with its path,
+  and the button-to-command map.
+- `test/machine-label.test.mts` - the machine label of every remote kind, the
+  fallbacks for missing host facts, and `readHostInfo`.
 - `test/pdf-command.test.mts` - the real desktop bundle and the real browser
   through `exportPdf` (skipped without a browser): a PDF for a plain page and
   for a page with diagrams, a cancellation that writes nothing, a missing
