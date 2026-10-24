@@ -131,6 +131,9 @@ test('the Export As HTML commands write a pinned, self-contained page for each t
     const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll('a')).map((link) => link.getAttribute('href')));
     expect(hrefs).toContain('export-images.md#part');
     expect(hrefs).toContain('https://example.com/page');
+    // The one exception: a protocol-relative link would otherwise become file://example.com/path.
+    expect(hrefs).toContain('https://example.com/path');
+    expect(hrefs).not.toContain('//example.com/path');
     expect(hrefs.filter((href) => href?.includes('..') || href?.startsWith('file:'))).toEqual([]);
     const anchorUrl = pathToFileURL(outputs.anchors).href;
     for (const hash of ['title', 'title-1']) {

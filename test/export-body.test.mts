@@ -88,6 +88,23 @@ test('links are left exactly as written, whatever they point at', async () => {
     assert.deepEqual(files.reads, []);
 });
 
+test('protocol-relative links and images get the https protocol and are never read', async () => {
+    const files = source({});
+    const html = '<a href="//example.com/path">x</a><img src="//example.com/a.png"><img srcset="//example.com/b.png 1x, //example.com/c.png 2x">';
+    const result = await prepareExportBody(html, { bases, source: files });
+    assert.equal(
+        result.html,
+        '<a href="https://example.com/path">x</a><img src="https://example.com/a.png"><img srcset="https://example.com/b.png 1x, https://example.com/c.png 2x">'
+    );
+    assert.deepEqual(files.reads, []);
+    assert.deepEqual(result.failures, []);
+});
+
+test('protocol-relative references are completed even without bases', async () => {
+    const result = await prepareExportBody('<a href="//example.com/p">x</a><a href="b.md">y</a>', { bases: undefined, source: source({}) });
+    assert.equal(result.html, '<a href="https://example.com/p">x</a><a href="b.md">y</a>');
+});
+
 test('a link is never embedded, even when it points at an image file', async () => {
     const files = source({ 'file:///d:/ws/docs/a.png': png });
     const result = await prepareExportBody('<a href="a.png">x</a>', { bases, source: files });

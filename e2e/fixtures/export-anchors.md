@@ -6,6 +6,7 @@
 - [Empty fragment](#)
 - [Images part](export-images.md#part)
 - [External](https://example.com/page)
+- [Protocol relative](//example.com/path)
 
 ## Title
 

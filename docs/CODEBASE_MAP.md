@@ -241,12 +241,14 @@ discarded, because the engine caches its tokens per document and writes
 `vscode-resource.vscode-cdn.net` URL. A tag-level
 scanner handles double-quoted, single-quoted, and unquoted values, decodes
 HTML entities before resolving and re-encodes after, and skips the content
-of `pre`, `code`, `script`, `style`, and comments. In-page anchors,
-protocol-relative references (`//host/...`), and references with a scheme
-stay untouched; a single-letter scheme is a Windows drive
-(`D:/ws/x.png` becomes `file:///D:/ws/x.png`). With an `undefined` base
-(untitled or virtual documents) the HTML is returned unchanged. `url()`
-inside inline `style` attributes is not rewritten.
+of `pre`, `code`, `script`, `style`, and comments. In-page anchors
+and references with a scheme stay untouched; a protocol-relative reference
+(`//host/path`) gets the `https:` protocol (`completeProtocolRelative`),
+because a page opened from disk would read it as `file://host/path`; a
+single-letter scheme is a Windows drive (`D:/ws/x.png` becomes
+`file:///D:/ws/x.png`). With an `undefined` base (untitled or virtual
+documents) no path is resolved, but protocol-relative references are still
+completed. `url()` inside inline `style` attributes is not rewritten.
 
 `rewriteDocumentReferences(html, rewrite)` is the scanner behind it: it calls
 `rewrite(reference, { tag, attribute })` for every URL-carrying attribute
@@ -273,7 +275,8 @@ other reference is returned exactly as written: links (`<a href>`, even to an
 image file), internet and `data:` images, and images that could not be
 embedded. An image that cannot be embedded gets its original path back
 (`data-src` wins over a preview-only `src`). The final place of the file is
-unknown, so no link is resolved for it. `isUriString` tells a URI argument
+unknown, so no link is resolved for it; the one exception is a
+protocol-relative reference (`//host/path`), which gets the `https:` protocol. `isUriString` tells a URI argument
 from a file system path.
 
 ### preview/mermaid-preview.mts

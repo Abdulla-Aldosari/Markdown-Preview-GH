@@ -69,16 +69,35 @@ export interface UrlResolutionBases {
     workspaceFolderUrl?: string;
 }
 
+/** A reference that names a host but no protocol: `//host/path`. */
+const protocolRelative = /^\/\/[^/\s]/;
+
+/**
+ * Gives a protocol-relative reference (`//host/path`) the `https:` protocol.
+ * Such a reference takes the protocol of the page that carries it, and an
+ * exported page is opened from `file:`, which would turn `//host/path` into
+ * `file://host/path`. A reference that is not protocol-relative is returned
+ * unchanged.
+ */
+export function completeProtocolRelative(reference: string): string {
+    const trimmed = reference.trim();
+    return protocolRelative.test(trimmed) ? `https:${trimmed}` : reference;
+}
+
 /**
  * Resolves a single reference. A reference that starts with `/` is a
  * workspace-root path (what the preview does), every other relative
- * reference is resolved against the document folder.
+ * reference is resolved against the document folder. A protocol-relative
+ * reference gets the `https:` protocol.
  * @returns the reference unchanged when it must not be touched.
  */
 export function resolveDocumentReference(reference: string, bases: UrlResolutionBases): string {
     const trimmed = reference.trim();
-    if (trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('//')) {
+    if (trimmed === '' || trimmed.startsWith('#')) {
         return reference;
+    }
+    if (trimmed.startsWith('//')) {
+        return completeProtocolRelative(reference);
     }
     try {
         if (windowsDrivePath.test(trimmed)) {
@@ -294,18 +313,21 @@ export function rewriteDocumentReferences(html: string, rewrite: ReferenceRewrit
     output.push(html.slice(index));
     return output.join('');
 }
+
 /**
  * Rewrites every relative reference in the rendered HTML to an absolute URL
- * against the given folders. In-page anchors, protocol-relative references,
- * and references that already carry a scheme are left as they are. An
- * `<img>` that carries `data-src` is resolved from that original path.
+ * against the given folders. In-page anchors and references that already
+ * carry a scheme are left as they are, and a protocol-relative reference
+ * gets the `https:` protocol. An `<img>` that carries `data-src` is resolved
+ * from that original path.
  *
  * @param bases The document and workspace folders. `undefined` (untitled or
- *        virtual documents) leaves the HTML as is.
+ *        virtual documents) resolves no path, but still completes
+ *        protocol-relative references.
  */
 export function resolveDocumentUrls(html: string, bases: UrlResolutionBases | undefined): string {
     if (bases === undefined) {
-        return html;
+        return rewriteDocumentReferences(html, (reference) => completeProtocolRelative(reference));
     }
     return rewriteDocumentReferences(html, (reference) => resolveDocumentReference(reference, bases));
 }

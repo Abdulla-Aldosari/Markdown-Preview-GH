@@ -10,13 +10,15 @@
  * that local images are embedded as data URIs, which makes them part of the
  * file. Every other reference (links, internet images, images that could
  * not be embedded) is left exactly as the author wrote it: the final place
- * of the file is unknown, so no link can be resolved for it.
+ * of the file is unknown, so no link can be resolved for it. The one
+ * exception is a protocol-relative reference (`//host/path`), which gets the
+ * `https:` protocol because a file opened from disk has no protocol to share.
  *
  * Pure logic with no `vscode` import; file access is injected.
  */
 
 import { isEmbeddableUrl, loadImages, type EmbedFailure, type ImageSource } from './image-embedding.mts';
-import { resolveDocumentReference, rewriteDocumentReferences, type ReferenceSite, type UrlResolutionBases } from './url-resolution.mts';
+import { completeProtocolRelative, resolveDocumentReference, rewriteDocumentReferences, type ReferenceSite, type UrlResolutionBases } from './url-resolution.mts';
 
 export interface ExportBodyOptions {
     /** The document and workspace folders, used to find the images to embed. `undefined` embeds nothing. */
@@ -56,7 +58,7 @@ export async function prepareExportBody(html: string, options: ExportBodyOptions
     const { dataUris, failures } = await loadImages(candidates, options.source);
     const output = rewriteDocumentReferences(html, (reference, site) => {
         const embedded = isImageSite(site) ? dataUris.get(resolve(reference)) : undefined;
-        return embedded ?? reference;
+        return embedded ?? completeProtocolRelative(reference);
     });
     return { html: output, failures, embeddedCount: dataUris.size };
 }

@@ -6,7 +6,7 @@
  *-------------------------------------------------*/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveDocumentUrls, type UrlResolutionBases } from '../src/url-resolution.mts';
+import { completeProtocolRelative, resolveDocumentUrls, type UrlResolutionBases } from '../src/url-resolution.mts';
 
 const documentDirUrl = 'file:///d%3A/ws/docs/';
 const workspaceFolderUrl = 'file:///d%3A/ws/';
@@ -46,8 +46,27 @@ test('references that carry a scheme stay unchanged', () => {
     }
 });
 
-test('protocol-relative references stay unchanged', () => {
-    assert.equal(imgSrc('//host/x.png'), '//host/x.png');
+test('protocol-relative references get the https protocol', () => {
+    assert.equal(imgSrc('//host/x.png'), 'https://host/x.png');
+    assert.equal(resolveDocumentUrls('<a href="//example.com/path">x</a>', dir), '<a href="https://example.com/path">x</a>');
+    assert.equal(resolveDocumentUrls('<a href="//example.com/path?q=1#part">x</a>', dir), '<a href="https://example.com/path?q=1#part">x</a>');
+});
+
+test('protocol-relative references are completed in srcset candidates and from data-src', () => {
+    assert.equal(resolveDocumentUrls('<img srcset="//h.com/a.png 1x, b.png 2x">', dir), '<img srcset="https://h.com/a.png 1x, file:///d%3A/ws/docs/b.png 2x">');
+    assert.equal(resolveDocumentUrls('<img src="x" data-src="//h.com/a.png">', dir), '<img src="https://h.com/a.png" data-src="//h.com/a.png">');
+});
+
+test('a reference with an empty host is not protocol-relative', () => {
+    assert.equal(completeProtocolRelative('///x.png'), '///x.png');
+    assert.equal(completeProtocolRelative('//'), '//');
+    assert.equal(completeProtocolRelative('/x.png'), '/x.png');
+    assert.equal(completeProtocolRelative('a//b'), 'a//b');
+    assert.equal(completeProtocolRelative('https://h.com/a'), 'https://h.com/a');
+});
+
+test('completeProtocolRelative ignores surrounding whitespace', () => {
+    assert.equal(completeProtocolRelative('  //host/x.png '), 'https://host/x.png');
 });
 
 test('Windows absolute paths become file URLs', () => {
@@ -55,9 +74,13 @@ test('Windows absolute paths become file URLs', () => {
     assert.equal(imgSrc('D:\\ws\\x.png'), 'file:///D:/ws/x.png');
 });
 
-test('a document that is not a file URI changes nothing', () => {
+test('a document that is not a file URI resolves no path', () => {
     const html = '<img src="./a.png"><a href="b.md">b</a>';
     assert.equal(resolveDocumentUrls(html, undefined), html);
+});
+
+test('a document that is not a file URI still completes protocol-relative references', () => {
+    assert.equal(resolveDocumentUrls('<a href="//example.com/p">x</a><a href="b.md">y</a>', undefined), '<a href="https://example.com/p">x</a><a href="b.md">y</a>');
 });
 
 test('srcset resolves every candidate and keeps descriptors', () => {
