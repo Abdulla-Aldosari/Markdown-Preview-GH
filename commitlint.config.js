@@ -31,6 +31,11 @@ const baseScopes = [
     ['exportHtml', 'standalone HTML export and browser/print commands', ['src/export-html.mts']],
     ['urlResolution', 'resolving relative links in the exported page to absolute URLs without a base element', ['src/url-resolution.mts']],
     ['exportBody', 'preparing the body of an exported HTML file: local image embedding and its pure helpers', ['src/export-body.mts', 'src/image-embedding.mts']],
+    [
+        'pageServer',
+        'serving the exported page from a temporary loopback HTTP server for Open in Browser and Print in remote windows: route matching, tokens, and the Node-only server',
+        ['src/page-server-routes.mts', 'src/page-server.mts'],
+    ],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
     [
         'mermaid-preview',
