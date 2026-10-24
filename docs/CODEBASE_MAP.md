@@ -284,7 +284,21 @@ as written, `//host` completed; a `file:///` link would name the wrong
 machine), serves it, maps the address with `vscode.env.asExternalUri` (which
 forwards the port), opens it with `openExternal`, and registers `dispose` in
 `context.subscriptions`. A failed mapping or open disposes the server and
-shows an error. Nothing is written to the remote disk.
+shows an error. Nothing is written to the remote disk. Images that stay links
+are not reported for this temporary page.
+
+`Open in Browser` and `Print...` share one flow in both window kinds:
+`exportDocumentCommand` ignores a repeated click for the same document while
+one export runs (`busy-guard.mts`), shows a progress notification during
+`prepareAndOpenPage`, and after the browser was opened shows `Page ready:
+<address>` with an `Open in Browser` button that opens the same page again
+(`announceReadyPage`; a served page reopens through a new server).
+
+### busy-guard.mts
+
+Pure (no `vscode` import). `createBusyGuard().tryEnter(key)` returns a release
+function, or `undefined` while the key is busy. A stale release never frees a
+key that was entered again.
 
 ### image-embedding.mts
 
@@ -704,6 +718,7 @@ One test file per module, all run with `npm test`:
   styles, entities, encoded and Arabic names, and skipped raw content.
 - `test/image-embedding.test.mts` - MIME mapping, embeddable schemes, the
   size cap, de-duplication, failures, and base64 equality with `Buffer`.
+- `test/busy-guard.test.mts` - busy keys, independent keys, and stale releases.
 - `test/page-server-routes.test.mts` - token encoding and uniqueness, exact
   route matching, and the local, served, and unsupported open modes.
 - `test/page-server.test.mts` - real HTTP requests to the server: headers,
@@ -711,8 +726,10 @@ One test file per module, all run with `npm test`:
 - `test/remote-open.test.mts` - the real desktop bundle activated against a
   remote-window stand-in: the page is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the
-  server stops on deactivation, mapping and open failures are reported, and
-  a local window never starts the server.
+  server stops on deactivation, mapping and open failures are reported, the
+  progress and ready notifications (with the reopen button) appear in both
+  window kinds, repeated clicks open one window, and a local window never
+  starts the server.
 - `test/export-body.test.mts` - the whole body preparation: embedding,
   `data-src`, `srcset`, missing images, links left as written, independence
   from the save folder, and code samples.
