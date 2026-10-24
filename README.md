@@ -83,6 +83,23 @@ Both are available from the preview context menu and from the Command Palette wh
 
 ![Print example](images/readme/print-example.png)
 
+### Export As...
+
+Right-click inside the preview and choose **Export As...** to save the document as a standalone HTML file:
+
+- **HTML Light Theme** - saves the page with the light theme.
+- **HTML Dark Theme** - saves the page with the dark theme.
+
+A save dialog asks where to put the file and suggests the Markdown file's name with an `.html` extension. Both commands are also in the Command Palette while a Markdown file is active, and they work in VS Code for the Web.
+
+The exported file is yours to move or share, so it carries only what it can hold itself:
+
+- **Local images are embedded** in the file, so they keep working wherever you move it. An image that is missing, larger than 20 MB, or of an unknown type keeps the path you wrote, and a warning lists it.
+- **Internet images stay links.** They load only while you are online.
+- **Links are left exactly as you wrote them.** A relative link such as `other.md` cannot know where you will keep the file, so it is not rewritten. The one exception is a link that starts with `//`, which becomes `https://`.
+
+To export without the save dialog, for example from a keybinding or a task, pass the destination in the command argument: `{ "target": "D:/out/page.html" }`. Add `"resource"` with the Markdown file's URI to export a file other than the active one.
+
 ### Open File on GitHub
 
 **Open File on GitHub** opens the current file on github.com from the preview context menu. It appears only when the file belongs to a repository with a GitHub remote and git tracks it, so ignored and untracked files never show it.
@@ -112,6 +129,8 @@ Right-click inside the preview for the per-file preferences, export, and GitHub 
 | Reset Preferences for this file | Preview context menu                  |
 | Open in Browser                 | Preview context menu, Command Palette |
 | Print...                        | Preview context menu, Command Palette |
+| Export As... > HTML Light Theme | Preview context menu, Command Palette |
+| Export As... > HTML Dark Theme  | Preview context menu, Command Palette |
 | Open File on GitHub             | Preview context menu                  |
 
 Command Palette entries are listed under the **Markdown Preview GH** category.
