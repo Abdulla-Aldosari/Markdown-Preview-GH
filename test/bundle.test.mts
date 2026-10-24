@@ -55,12 +55,21 @@ test('the web bundle is a single CommonJS file that requires only vscode', async
     assert.match(code, /module\.exports/);
 });
 
+test('only the desktop bundle contains the page server', async () => {
+    const outputs = await buildInMemory(false);
+    assert.match(outputs.get('extension.js') ?? '', /node:http/);
+    assert.doesNotMatch(outputs.get('extension-web.js') ?? '', /node:http|createServer/);
+});
+
 for (const name of ['extension.js', 'extension-web.js']) {
     test(`${name} exports activate when loaded with a vscode stand-in`, async () => {
         const code = (await buildInMemory(true)).get(name);
         assert.ok(code);
         const module = { exports: {} as Record<string, unknown> };
         const sandboxRequire = (specifier: string) => {
+            if (name === 'extension.js' && specifier.startsWith('node:')) {
+                return {};
+            }
             assert.equal(specifier, 'vscode');
             return {};
         };

@@ -20,6 +20,7 @@ import { isUriString, prepareExportBody } from './export-body.mts';
 import type { ImageSource } from './image-embedding.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
+import { chooseOpenMode, type DesktopServices } from './page-server-routes.mts';
 import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
 
 type CommandArgs = { resource?: string } | undefined;
@@ -33,6 +34,9 @@ const filePreferencesKey = 'filePreferences';
 let preferencesStore: vscode.Memento | undefined;
 
 let extensionContext: vscode.ExtensionContext | undefined;
+
+/** Node-only services injected by the desktop entry point; `undefined` in the web bundle. */
+let desktopServices: DesktopServices | undefined;
 
 const directionLabels: Record<string, string> = {
     ltr: 'LTR (Left to Right)',
@@ -155,10 +159,12 @@ function resetFilePreferences(resource: string): void {
  * configuration listener that refreshes the preview when the watched
  * settings change, and returns the Markdown-it extension hook.
  * @param context The extension context of the active session.
+ * @param services Node-only services; only the desktop entry point passes them.
  */
-export function activate(context: vscode.ExtensionContext): { extendMarkdownIt(markdownIt: MarkdownIt): MarkdownIt } {
+export function activate(context: vscode.ExtensionContext, services?: DesktopServices): { extendMarkdownIt(markdownIt: MarkdownIt): MarkdownIt } {
     preferencesStore = context.workspaceState;
     extensionContext = context;
+    desktopServices = services;
 
     const watchedKeys = ['colorTheme', 'contentDirection', 'contentWidth'].map((key) => `${CONFIG_SECTION}.${key}`);
     /**
@@ -629,6 +635,11 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         vscode.window.showErrorMessage('Open a Markdown file to use this command.');
         return;
     }
+    const mode = chooseOpenMode(vscode.env.remoteName, desktopServices !== undefined);
+    if (mode === 'unsupported') {
+        vscode.window.showErrorMessage('Open in Browser and Print are not available in this window.');
+        return;
+    }
     try {
         const document = await vscode.workspace.openTextDocument(uri);
         const bodyHtml = await vscode.commands.executeCommand<unknown>('markdown.api.render', document);
@@ -641,6 +652,30 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         const css = await readPreviewStyles(ctx);
         const displayName = uri.path.split('/').pop() || 'document';
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+
+        if (mode === 'served') {
+            // The page cannot be a local file here, so it is served and the
+            // port is forwarded. Links stay as written and local images are
+            // embedded: a `file:///` link would point at the wrong machine.
+            const body = await prepareExportBody(prepared.html, {
+                bases:
+                    uri.scheme === 'untitled'
+                        ? undefined
+                        : {
+                              documentDirUrl: `${vscode.Uri.joinPath(uri, '..').toString()}/`,
+                              workspaceFolderUrl: workspaceFolder ? `${workspaceFolder.uri.toString()}/` : undefined,
+                          },
+                source: workspaceImageSource,
+            });
+            const servedHtml = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, autoPrint, theme, ...scripts });
+            await openServedPage(ctx, servedHtml);
+            if (body.failures.length > 0) {
+                const list = body.failures.map((failure) => `${failure.url} (${failure.reason})`).join(', ');
+                vscode.window.showWarningMessage(`Opened with ${body.failures.length} image(s) kept as links: ${list}`);
+            }
+            return;
+        }
+
         const bases =
             uri.scheme === 'file'
                 ? {
@@ -669,6 +704,30 @@ async function exportDocumentCommand(args: unknown, autoPrint: boolean): Promise
         vscode.window.showErrorMessage(`Failed to export Markdown preview: ${message}`);
     }
 }
+/**
+ * Serves the page from the extension host, maps its address for the local
+ * machine (which sets up port forwarding in a remote window), and opens it in
+ * the browser. The server is stopped with the extension.
+ */
+async function openServedPage(ctx: vscode.ExtensionContext, html: string): Promise<void> {
+    const services = desktopServices;
+    if (!services) {
+        throw new Error('The page server is not available in this window.');
+    }
+    const page = await services.servePage(html);
+    ctx.subscriptions.push({ dispose: page.dispose });
+    try {
+        const external = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${page.port}${page.path}`));
+        const opened = await vscode.env.openExternal(external);
+        if (!opened) {
+            throw new Error(`Could not open the page in the browser: ${external.toString()}`);
+        }
+    } catch (error) {
+        page.dispose();
+        throw error;
+    }
+}
+
 /** Reads local images through the workspace file system, on desktop and on the web. */
 const workspaceImageSource: ImageSource = {
     async size(url: string): Promise<number> {
