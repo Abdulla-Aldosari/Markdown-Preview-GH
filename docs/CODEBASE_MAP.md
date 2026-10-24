@@ -46,7 +46,8 @@ in the workspace state takes priority over the global mode.
   `base-styles.css`).
 - `test/` - unit tests (`*.test.mts`) for every runtime module, pipeline
   module, and the bundle output, run by the built-in `node:test` runner
-  directly on the TypeScript sources.
+  directly on the TypeScript sources. `desktop-harness.mts`, `disk-uri.mts`,
+  and `isolated-temp.mts` are test support, not tests.
 - `e2e/` - UI tests (`*.spec.ts`, `helpers.mts`, `fixtures/`) driven by
   Playwright's Electron launcher against a real VS Code window
   (`npm run test:e2e`); `playwright.config.ts` configures them.
