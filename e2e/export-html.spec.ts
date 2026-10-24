@@ -41,7 +41,10 @@ test.beforeAll(async () => {
         fs.readFileSync(imagesFile, 'utf8').replaceAll('{{FIXTURES_DIR}}', workspaceRoot.replace(/\\/g, '/')).replaceAll('{{REMOTE_IMAGE_URL}}', remoteUrl),
         'utf8'
     );
-    outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-export-html-out-'));
+    // A folder at a different depth than the fixtures, so any link computed
+    // from the save location would differ from what the author wrote.
+    outputDir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-export-html-out-')), 'Sub-1', 'Sub-2');
+    fs.mkdirSync(outputDir, { recursive: true });
 
     browser = await chromium.launch();
     page = await browser.newPage();
@@ -108,7 +111,7 @@ test('the Export As HTML commands write a pinned, self-contained page for each t
         if (image.alt === 'remote') {
             expect(image.src, image.alt).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/remote\.png$/);
         } else if (image.alt === 'missing') {
-            expect(image.src, image.alt).not.toMatch(/^data:/);
+            expect(image.src, image.alt).toBe('assets/does-not-exist.png');
             expect(image.width, image.alt).toBe(0);
         } else {
             expect(image.src, image.alt).toMatch(/^data:image\//);
@@ -124,9 +127,11 @@ test('the Export As HTML commands write a pinned, self-contained page for each t
     expect(await page.locator('body').getAttribute('class')).toContain('vscode-dark');
 
     await page.goto(pathToFileURL(outputs.anchors).href);
-    const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll('a')).map((link) => link.href));
-    expect(hrefs).toContain(`${pathToFileURL(path.join(workspaceRoot, 'export-images.md')).href}#part`);
+    // Links are left exactly as the author wrote them, wherever the file is saved.
+    const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll('a')).map((link) => link.getAttribute('href')));
+    expect(hrefs).toContain('export-images.md#part');
     expect(hrefs).toContain('https://example.com/page');
+    expect(hrefs.filter((href) => href?.includes('..') || href?.startsWith('file:'))).toEqual([]);
     const anchorUrl = pathToFileURL(outputs.anchors).href;
     for (const hash of ['title', 'title-1']) {
         await page.locator(`a[href="#${hash}"]`).click();

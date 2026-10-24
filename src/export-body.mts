@@ -6,23 +6,21 @@
  *-------------------------------------------------*/
 
 /**
- * Prepares the rendered body of an exported HTML file: every relative
- * reference is resolved against the document, local images are embedded as
- * data URIs, and every other local reference is rewritten relative to the
- * folder the file is written to.
+ * Prepares the rendered body of an exported HTML file. The only change is
+ * that local images are embedded as data URIs, which makes them part of the
+ * file. Every other reference (links, internet images, images that could
+ * not be embedded) is left exactly as the author wrote it: the final place
+ * of the file is unknown, so no link can be resolved for it.
  *
  * Pure logic with no `vscode` import; file access is injected.
  */
 
 import { isEmbeddableUrl, loadImages, type EmbedFailure, type ImageSource } from './image-embedding.mts';
-import { rebaseReference } from './url-rebase.mts';
 import { resolveDocumentReference, rewriteDocumentReferences, type ReferenceSite, type UrlResolutionBases } from './url-resolution.mts';
 
 export interface ExportBodyOptions {
-    /** The document and workspace folders; `undefined` leaves references as they are. */
+    /** The document and workspace folders, used to find the images to embed. `undefined` embeds nothing. */
     bases: UrlResolutionBases | undefined;
-    /** The folder the file is written to, as a URL ending in `/`. */
-    outputDirUrl: string;
     /** Reads the local images. */
     source: ImageSource;
 }
@@ -41,9 +39,9 @@ function isImageSite(site: ReferenceSite): boolean {
 }
 
 /**
- * Resolves, embeds, and rebases the references of a rendered body. The
- * original path of an image (`data-src`) wins over its `src`, which can
- * hold a preview-only URL.
+ * Embeds the local images of a rendered body. The original path of an image
+ * (`data-src`) wins over its `src`, which can hold a preview-only URL, so an
+ * image that cannot be embedded gets its original path back.
  */
 export async function prepareExportBody(html: string, options: ExportBodyOptions): Promise<ExportBody> {
     const resolve = (reference: string): string => (options.bases === undefined ? reference : resolveDocumentReference(reference, options.bases));
@@ -57,9 +55,8 @@ export async function prepareExportBody(html: string, options: ExportBodyOptions
     });
     const { dataUris, failures } = await loadImages(candidates, options.source);
     const output = rewriteDocumentReferences(html, (reference, site) => {
-        const resolved = resolve(reference);
-        const embedded = isImageSite(site) ? dataUris.get(resolved) : undefined;
-        return embedded ?? rebaseReference(resolved, options.outputDirUrl);
+        const embedded = isImageSite(site) ? dataUris.get(resolve(reference)) : undefined;
+        return embedded ?? reference;
     });
     return { html: output, failures, embeddedCount: dataUris.size };
 }
