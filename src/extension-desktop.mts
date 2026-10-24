@@ -11,4 +11,16 @@
  * never reach the web bundle.
  */
 
-export { activate } from './extension.mts';
+import type * as vscode from 'vscode';
+import { activate as activateExtension } from './extension.mts';
+import { startPageServer } from './page-server.mts';
+import type { DesktopServices } from './page-server-routes.mts';
+
+const services: DesktopServices = {
+    servePage: (html) => startPageServer({ html }),
+};
+
+/** Activates the extension with the Node-only services of the desktop host. */
+export function activate(context: vscode.ExtensionContext): ReturnType<typeof activateExtension> {
+    return activateExtension(context, services);
+}

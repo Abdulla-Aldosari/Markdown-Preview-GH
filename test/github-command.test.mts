@@ -145,6 +145,11 @@ async function activateExtension(vscodeStub: Record<string, unknown>): Promise<v
         module,
         exports: module.exports,
         require: (specifier: string) => {
+            // The desktop bundle loads the page server's Node built-ins; this
+            // test never serves a page, so empty stand-ins are enough.
+            if (specifier.startsWith('node:')) {
+                return {};
+            }
             assert.equal(specifier, 'vscode');
             return vscodeStub;
         },
