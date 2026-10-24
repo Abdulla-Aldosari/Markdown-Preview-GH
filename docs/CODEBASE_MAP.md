@@ -143,8 +143,8 @@ The shared extension code. It is the only module with logic that imports
   document's folder as the base (only for `file` documents).
 - The `Export As...` submenu of the preview context menu
   (`markdown-preview-gh.exportAs`) lists `HTML Light Theme`, `HTML Dark
-Theme`, `PDF`, and `PNG`; the PDF and PNG items are declared but hidden
-  (`when: false`). `exportHtmlCommand` writes a self-contained HTML file
+Theme`, `PDF`, and `PNG`; `PDF` is shown on desktop (`when: !isWeb`) and
+  `PNG` is declared but hidden (`when: false`). `exportHtmlCommand` writes a self-contained HTML file
   pinned to the chosen theme through `vscode.workspace.fs`, so it also runs
   on VS Code for the Web. An argument `{ resource, target }` skips the
   save dialog (`resolveExportTarget`); without `target`, `showSaveDialog`
@@ -339,7 +339,34 @@ executablePath, url, waitForMarker, timeoutMs, signal })` creates and
   (default two minutes), an aborted signal, an early browser exit, or a
   failed navigation rejects and disposes the browser.
 
+- `pdf-export.mts` - pure. `buildPdfParams()` (`printBackground`,
+  `preferCSSPageSize`, no header or footer) and `printPageToPdf(page)`, which
+  sends `Page.printToPDF`, decodes the payload, and rejects an empty reply or
+  data that does not start with `%PDF-`.
+- `missing-browser.mts` - pure. `describeMissingBrowser(lookup, format)` builds
+  the error text (a wrong `browserPath` is named with its path) and the
+  buttons: `Open Settings`, `Export as HTML instead`, and, for PDF only,
+  `Open in Browser (then Save as PDF)`. `followUpCommand(label, resource)`
+  maps a button to the command it runs for the same document.
+
 `markdown-preview-gh.export.browserPath` overrides the browser search.
+
+`exportPdfCommand` (desktop only, registered for every window; the web bundle
+reports that the command is unavailable) looks the browser up first; a
+missing one shows the notification above and nothing else. Otherwise it asks
+for the target (`resolveExportTarget` with a `PDF` filter, or the `target`
+argument), shows a cancellable progress notification, and `renderPdfFile`
+builds the page with `buildEmbeddedPage` (the same body as the HTML export,
+always pinned to the light theme, local images embedded, links as written),
+writes it to `globalStorage` as a temporary file, opens it with
+`openHeadlessPage` (waiting for the ready marker only when the page carries
+diagrams), prints it, and writes the PDF. The temporary page is always
+deleted; a cancellation aborts the browser, writes nothing, and reports
+nothing; a success announces the location like the HTML export; a repeated
+click on the same document is ignored (`pdfGuard`).
+
+The export page (`preview/mermaid-export.mts`) sets `data-mpgh-ready` on
+`<html>` when its diagrams are drawn or have fallen back to code blocks.
 
 ### busy-guard.mts
 
@@ -780,6 +807,23 @@ One test file per module, all run with `npm test`:
 - `test/browser-locator.test.mts` - the setting wins and is never replaced,
   Edge before Chrome on Windows, macOS bundles, and the Linux `PATH` order.
 - `test/ready-marker.test.mts` - the readiness expression is valid JavaScript.
+- `test/pdf-export.test.mts` - the print parameters, base64 decoding, and the
+  rejection of an empty reply or of data that is not a PDF.
+- `test/missing-browser.test.mts` - the notification text and buttons per
+  format, a wrong setting named with its path, and the button-to-command map.
+- `test/pdf-command.test.mts` - the real desktop bundle and the real browser
+  through `exportPdf` (skipped without a browser): a PDF for a plain page and
+  for a page with diagrams, a cancellation that writes nothing, a missing
+  browser with its three buttons, and a render failure that leaves nothing
+  behind.
+- `test/print-theme.test.mts` - with print media emulated in the real browser,
+  a dark page stays dark on screen and is fully light in print.
+- `test/desktop-harness.mts`, `test/disk-uri.mts`, `test/isolated-temp.mts` -
+  test support: the desktop bundle with a `vscode` stand-in over the real
+  disk, its URI and file system, and a per-process temporary directory (test
+  files run in parallel and share the system one). Not test files.
+- `e2e/export-pdf.spec.ts` - a real VS Code window runs `exportPdf` through a
+  keybinding with `{ resource, target }` and the output is a PDF.
 - `test/headless-export.test.mts` - the launch arguments, and (skipped when no
   browser is installed) a real browser that prints a PDF, waits for the ready
   marker, stops on a timeout and on an aborted signal, and always deletes its
@@ -834,7 +878,8 @@ One test file per module, all run with `npm test`:
   `package.json`: every command outside the `Export As...` submenu is
   listed, every entry (commands and the submenu) is hidden while the viewer
   layer is under the pointer, and the submenu holds the four formats in
-  order with PDF and PNG hidden.
+  order with PDF desktop only and PNG hidden; the PDF command is listed in
+  the Command Palette for Markdown files on desktop.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
