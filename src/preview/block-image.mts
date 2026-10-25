@@ -34,6 +34,7 @@ import {
     describeFailure,
     describeSuccess,
     isTransparentColor,
+    layoutZoom,
     maxCaptureNodes,
     planCapture,
     sectionLength,
@@ -247,12 +248,19 @@ interface DrawnBlock {
     missingPictures: number;
 }
 
-/** Builds the detached tree the image is made of: the subject, positioned as in the page, on the page background. */
-function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[], width: number, height: number): { wrapper: Element; clones: Element[] } {
+/**
+ * Builds the detached tree the image is made of: the subject, positioned as in
+ * the page, on the page background. The tree is laid out at `zoom` (see
+ * `layoutZoom`), so its sizes stay in the page's css pixels.
+ */
+function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[], width: number, height: number, zoom: number): { wrapper: Element; clones: Element[] } {
     const left = Math.min(...rects.map((rect) => rect.left));
     const top = Math.min(...rects.map((rect) => rect.top));
     const wrapper = document.createElementNS(xhtmlNamespace, 'div');
-    wrapper.setAttribute('style', `position:relative;box-sizing:border-box;width:${width}px;height:${height}px;overflow:hidden;background:${pageBackground(subject[0])};`);
+    wrapper.setAttribute(
+        'style',
+        `zoom:${zoom};position:relative;box-sizing:border-box;width:${width}px;height:${height}px;overflow:hidden;background:${pageBackground(subject[0])};`
+    );
     const clones = subject.map((element, position) => {
         const clone = element.cloneNode(true) as Element;
         inlineComputedStyles(element, clone);
@@ -288,10 +296,14 @@ async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
     if (nodeCount > maxCaptureNodes) {
         throw new CopyFailure('tooManyNodes');
     }
-    const { wrapper, clones } = buildCaptureTree(subject, rects, width, height);
+    const zoom = layoutZoom(window.devicePixelRatio);
+    const { wrapper, clones } = buildCaptureTree(subject, rects, width, height, zoom);
     const missingPictures = await embedPictures(subject, clones);
     const markup = new XMLSerializer().serializeToString(wrapper);
-    const svg = `<svg xmlns="${svgNamespace}" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${markup}</foreignObject></svg>`;
+    // The document is `zoom` times larger than the block; it is drawn back at the block's css size.
+    const svgWidth = Math.ceil(width * zoom);
+    const svgHeight = Math.ceil(height * zoom);
+    const svg = `<svg xmlns="${svgNamespace}" width="${svgWidth}" height="${svgHeight}"><foreignObject width="100%" height="100%">${markup}</foreignObject></svg>`;
     let image: HTMLImageElement;
     try {
         image = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
@@ -306,7 +318,7 @@ async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
         throw new CopyFailure('draw');
     }
     context.scale(planned.plan.scale, planned.plan.scale);
-    context.drawImage(image, 0, 0);
+    context.drawImage(image, 0, 0, svgWidth / zoom, svgHeight / zoom);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
     canvas.remove();
     if (!blob) {

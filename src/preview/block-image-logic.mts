@@ -33,6 +33,21 @@ export const canvasLimits = { maxSide: 16384, maxArea: 100_000_000 } as const;
 /** The pixel densities to try, sharpest first. */
 export const captureScales = [2, 1] as const;
 
+/**
+ * The zoom the image document is laid out at: the device pixel ratio of the
+ * page. The page snaps every thin border to whole device pixels, so at a
+ * fractional ratio a `1px` border is computed as `1 / ratio` css pixels (for
+ * example `0.8px` at 125%). An image document has a ratio of 1 and would draw
+ * that border a whole pixel wide again; every cell, whose size is copied from
+ * the page, would then lose that fraction to its border, break its text onto a
+ * second line, and push the bottom of the block out of the image. Laid out at
+ * the page's ratio, the document snaps and measures exactly as the page did.
+ * An unusable ratio falls back to 1.
+ */
+export function layoutZoom(devicePixelRatio: number): number {
+    return Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
+}
+
 /** The level (1 to 6) of a heading tag name, or `null` for any other tag. */
 export function headingLevel(tagName: string): number | null {
     const match = /^H([1-6])$/i.exec(tagName);

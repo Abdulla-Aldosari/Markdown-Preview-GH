@@ -17,6 +17,7 @@ import {
     describeSuccess,
     headingLevel,
     isTransparentColor,
+    layoutZoom,
     planCapture,
     sectionLength,
 } from '../src/preview/block-image-logic.mts';
@@ -56,6 +57,20 @@ test('sectionLength is 0 when the start is not a heading or is out of range', ()
     assert.equal(sectionLength(['H2'], 1), 0);
     assert.equal(sectionLength(['H2'], -1), 0);
     assert.equal(sectionLength([], 0), 0);
+});
+
+test('layoutZoom is the device pixel ratio of the page, fractional ones included', () => {
+    assert.equal(layoutZoom(1), 1);
+    assert.equal(layoutZoom(1.25), 1.25);
+    assert.equal(layoutZoom(1.5), 1.5);
+    assert.equal(layoutZoom(2), 2);
+    assert.equal(layoutZoom(0.8333333), 0.8333333);
+});
+
+test('layoutZoom falls back to 1 for a ratio that cannot be used', () => {
+    for (const ratio of [0, -1.25, Number.NaN, Number.POSITIVE_INFINITY]) {
+        assert.equal(layoutZoom(ratio), 1, String(ratio));
+    }
 });
 
 test('planCapture takes the sharpest density that fits', () => {
