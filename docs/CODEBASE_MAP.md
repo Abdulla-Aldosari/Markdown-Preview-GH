@@ -580,19 +580,26 @@ page's ratio the document snaps and measures exactly as the page did.
 Pictures are replaced by data URIs first. A loaded picture is redrawn on a
 canvas; when the canvas is locked (a picture from another origin) the picture is
 requested once more as an image with `crossOrigin = 'anonymous'`, which only a
-server that allows it answers. A script never fetches a picture: the preview's
-security policy forbids it, and every fetch makes the preview show "Some content
-has been disabled in this document". A picture that never loaded is not
-requested again. A picture that cannot be read is hidden and the toast says how
-many were left out. A diagram that is still being drawn is refused ("still being
-drawn"), as is a block above the canvas limits (16384 px a side, 100 million
-pixels) or 1500 elements.
+server that allows it answers. While those remote requests run, a progress bar
+(`role="progressbar"`, "Fetching remote pictures: N of M") shows at the bottom
+of the preview and is removed when they end; pictures the page can already read
+never show it. A script never fetches a picture: the preview's security policy
+forbids it, and every fetch makes the preview show "Some content has been
+disabled in this document". A picture that never loaded is not requested again.
+The copy is complete or it fails: one picture that cannot be read (a remote host
+that sends no `Access-Control-Allow-Origin`, or a redirect whose target does not)
+fails the whole copy with a message that counts the pictures and names their
+hosts, and nothing reaches the clipboard. A diagram that is still being drawn is
+refused ("still being drawn"), as is a block above the canvas limits (16384 px a
+side, 100 million pixels) or 1500 elements.
 
 The decisions live in the pure `preview/block-image-logic.mts`:
 `blockSelectors`, `headingLevel`, `sectionLength`, `layoutZoom` (the zoom of the
 image document, 1 for an unusable ratio), `planCapture` (density and
 canvas size, `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
-`isTransparentColor`, and the success and failure messages.
+`isTransparentColor`, `pictureHost`, `describeProgress`, `progressPercent`, and
+the success and failure messages (the `picture` failure lists the hosts of the
+pictures that could not be fetched).
 
 ### preview/mermaid-theme-logic.mts
 
@@ -715,11 +722,13 @@ when printing. The export page never loads it.
 
 ### block-image.css
 
-The stylesheet of the toast the block-to-image script shows after a copy: a
-fixed, centered message at the bottom of the preview, colored with the editor
-widget variables VS Code defines for webviews (with fallbacks), and the error
-variant (`.is-error`) with the input-validation colors. It ignores pointer
-events. The export page never loads it.
+The stylesheet of the toast and the progress bar the block-to-image script
+shows: a fixed, centered message at the bottom of the preview after a copy, and
+a bar with a label while remote pictures are fetched. Both are colored with the
+editor widget variables VS Code defines for webviews (with fallbacks); the bar
+fills with the progress-bar color and the error variant of the toast
+(`.is-error`) uses the input-validation colors. Both ignore pointer events. The
+export page never loads it.
 
 ### Naming scheme
 
@@ -1034,7 +1043,8 @@ One test file per module, all run with `npm test`:
 - `test/block-image-logic.test.mts` - the selectors, heading levels, section
   boundaries, the density and canvas plan at and beyond the limits, empty and
   invalid sizes, which overflow values are cut, when a picture is requested
-  again with CORS, transparent colors, and the messages.
+  again with CORS, transparent colors, the picture hosts, the progress text
+  and percentage, and the messages.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
@@ -1062,8 +1072,16 @@ One test file per module, all run with `npm test`:
   block, a code block wider than the column, a diagram, and a section holding
   lists, a blockquote, an alert, task lists, a code block, a diagram, and a
   table each start and end at the padding (nothing is cut on either side) and
-  show no scrollbar; a section with a picture that cannot be read says so and
-  the preview shows no blocked-content warning.
+  show no scrollbar; a section with a picture that cannot be fetched fails the
+  whole copy, names the host, leaves the clipboard empty, and the preview shows
+  no blocked-content warning.
+- `e2e/block-image-remote.spec.ts` - a local HTTPS server (the preview allows
+  only `https:` pictures; the test certificate is in `fixtures/tls/`, and the
+  window starts with `--ignore-certificate-errors`) serves a picture that
+  answers a CORS request after a delay, with or without
+  `Access-Control-Allow-Origin`: the progress bar shows "0 of 1" and is gone
+  afterwards; with CORS the copy succeeds and reaches the clipboard; without it
+  the copy fails as a whole with the host in the message.
 - `e2e/block-image-scale.spec.ts` (fixture `fixtures/block-image-scale.md`,
   measuring helper `tableLines`) - VS Code runs at a device scale of 1.25
   (`--force-device-scale-factor=1.25`); three tables with two-word cells are
