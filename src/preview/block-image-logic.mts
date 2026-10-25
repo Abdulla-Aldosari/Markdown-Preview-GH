@@ -61,6 +61,25 @@ export function sectionLength(tagNames: readonly string[], start: number): numbe
 }
 
 /**
+ * Whether an element with these computed overflow values scrolls. The image
+ * shows what the preview shows, so such an element is clipped at its box and
+ * never draws a scrollbar: the bars belong to the live page, not to the picture.
+ */
+export function clipsOverflow(overflowX: string, overflowY: string): boolean {
+    return [overflowX, overflowY].some((value) => value === 'auto' || value === 'scroll');
+}
+
+/**
+ * Whether a picture that is already loaded in the page can still be read from
+ * a canvas by loading it again with CORS. A picture that failed to load (the
+ * page blocked it or the network did) is never requested again: a second
+ * request would only repeat the violation the preview reports to the user.
+ */
+export function canRetryWithCors(loaded: boolean, readable: boolean): boolean {
+    return loaded && !readable;
+}
+
+/**
  * Whether a computed CSS color paints nothing (`transparent`, or an `rgba`
  * value with a zero alpha). Used to look past layers without a background
  * when the image needs the color of the page behind a block.

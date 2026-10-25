@@ -28,7 +28,9 @@
 import { blockContextKey, blockIndexContextKey, blockKinds, blockLabels, decodeCaptureId, type BlockKind, type CaptureTarget } from '../block-image-protocol.mts';
 import {
     blockSelectors,
+    canRetryWithCors,
     capturePadding,
+    clipsOverflow,
     describeFailure,
     describeSuccess,
     isTransparentColor,
@@ -46,6 +48,8 @@ const xhtmlNamespace = 'http://www.w3.org/1999/xhtml';
 const svgNamespace = 'http://www.w3.org/2000/svg';
 /** How long the page waits for the focus the clipboard needs after the menu closes. */
 const focusWaitMs = 5000;
+/** How long a picture may take to answer the CORS request before it is left out. */
+const corsWaitMs = 5000;
 const infoToastMs = 3000;
 const errorToastMs = 6000;
 
@@ -121,6 +125,11 @@ function inlineComputedStyles(source: Element, clone: Element): void {
     for (const property of Array.from(computed)) {
         declarations.push(`${property}:${computed.getPropertyValue(property)}`);
     }
+    // The image shows what the preview shows: a box that scrolls on the page is
+    // cut at its edge, and never draws a scrollbar of its own.
+    if (clipsOverflow(computed.overflowX, computed.overflowY)) {
+        declarations.push('overflow:hidden');
+    }
     clone.setAttribute('style', declarations.join(';'));
     clone.removeAttribute(contextAttribute);
     const sourceChildren = Array.from(source.children);
@@ -130,45 +139,60 @@ function inlineComputedStyles(source: Element, clone: Element): void {
     }
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error('the picture could not be read'));
-        reader.readAsDataURL(blob);
+/** The pixels of a loaded picture as a PNG data URI, or `null` when the picture locks them (a taint from another origin). */
+function readPixels(image: HTMLImageElement): string | null {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth;
+        canvas.height = image.naturalHeight;
+        canvas.getContext('2d')?.drawImage(image, 0, 0);
+        const url = canvas.toDataURL('image/png');
+        return url.startsWith('data:image/') ? url : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Loads a picture again as a CORS request. Only a server that allows it hands
+ * its pixels over; for any other the load simply fails. The load is an image
+ * request, which the preview's security policy allows, so a refusal is silent.
+ */
+function readWithCors(source: string): Promise<string | null> {
+    return new Promise((resolve) => {
+        const image = new Image();
+        const timer = window.setTimeout(() => resolve(null), corsWaitMs);
+        image.crossOrigin = 'anonymous';
+        image.onload = () => {
+            window.clearTimeout(timer);
+            resolve(readPixels(image));
+        };
+        image.onerror = () => {
+            window.clearTimeout(timer);
+            resolve(null);
+        };
+        image.src = source;
     });
 }
 
 /**
  * The picture as a data URI, because an image drawn from an SVG cannot load
- * anything else. A loaded picture is redrawn on a canvas first; a picture from
- * another origin taints the canvas and is then fetched instead.
+ * anything else. A loaded picture is redrawn on a canvas first; when that is
+ * locked, one CORS request may unlock it. Nothing is fetched with a script: the
+ * preview forbids it, and every attempt would be reported to the user as
+ * blocked content.
  */
 async function imageToDataUrl(image: HTMLImageElement): Promise<string | null> {
     const source = image.currentSrc || image.src;
     if (source.startsWith('data:')) {
         return source;
     }
-    if (image.complete && image.naturalWidth > 0) {
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = image.naturalWidth;
-            canvas.height = image.naturalHeight;
-            canvas.getContext('2d')?.drawImage(image, 0, 0);
-            const url = canvas.toDataURL('image/png');
-            if (url.startsWith('data:image/')) {
-                return url;
-            }
-        } catch {
-            // The canvas is tainted: fall through to fetching the picture.
-        }
+    const loaded = image.complete && image.naturalWidth > 0;
+    const direct = loaded ? readPixels(image) : null;
+    if (direct) {
+        return direct;
     }
-    try {
-        const response = await fetch(source);
-        return response.ok ? await blobToDataUrl(await response.blob()) : null;
-    } catch {
-        return null;
-    }
+    return canRetryWithCors(loaded, false) ? readWithCors(source) : null;
 }
 
 /** The pictures of an element, or the element itself when it is one. */
@@ -235,7 +259,11 @@ function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[]
         // Each block keeps its offset from the first one; the page margins stay out of the image.
         const x = capturePadding + rects[position].left - left;
         const y = capturePadding + rects[position].top - top;
-        clone.setAttribute('style', `${clone.getAttribute('style') ?? ''};position:absolute;left:${x}px;top:${y}px;width:${rects[position].width}px;margin:0;`);
+        // The measured rectangle is the border box, so the box is sized as one: a
+        // `content-box` element (a list, a code block, an alert) would otherwise
+        // add its padding outside the rectangle and leave the image.
+        const box = `box-sizing:border-box;width:${rects[position].width}px;height:${rects[position].height}px`;
+        clone.setAttribute('style', `${clone.getAttribute('style') ?? ''};position:absolute;left:${x}px;top:${y}px;${box};margin:0;`);
         wrapper.append(clone);
         return clone;
     });

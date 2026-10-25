@@ -8,7 +8,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blockKinds } from '../src/block-image-protocol.mts';
-import { blockSelectors, canvasLimits, describeFailure, describeSuccess, headingLevel, isTransparentColor, planCapture, sectionLength } from '../src/preview/block-image-logic.mts';
+import {
+    blockSelectors,
+    canRetryWithCors,
+    canvasLimits,
+    clipsOverflow,
+    describeFailure,
+    describeSuccess,
+    headingLevel,
+    isTransparentColor,
+    planCapture,
+    sectionLength,
+} from '../src/preview/block-image-logic.mts';
 
 test('every block kind has a selector', () => {
     assert.deepEqual(Object.keys(blockSelectors).sort(), [...blockKinds].sort());
@@ -93,6 +104,37 @@ test('planCapture rejects empty and invalid sizes', () => {
     ]) {
         assert.deepEqual(planCapture(width, height), { ok: false, reason: 'empty' }, `${width}x${height}`);
     }
+});
+
+test('clipsOverflow is true for every scrolling overflow value on either axis', () => {
+    for (const [x, y] of [
+        ['auto', 'auto'],
+        ['scroll', 'visible'],
+        ['visible', 'auto'],
+        ['hidden', 'scroll'],
+        ['auto', 'hidden'],
+    ]) {
+        assert.equal(clipsOverflow(x, y), true, `${x} ${y}`);
+    }
+});
+
+test('clipsOverflow is false when nothing scrolls', () => {
+    for (const [x, y] of [
+        ['visible', 'visible'],
+        ['hidden', 'hidden'],
+        ['clip', 'clip'],
+        ['hidden', 'visible'],
+        ['', ''],
+    ]) {
+        assert.equal(clipsOverflow(x, y), false, `${x} ${y}`);
+    }
+});
+
+test('a picture is retried with CORS only when it loaded and its pixels are locked', () => {
+    assert.equal(canRetryWithCors(true, false), true, 'loaded but tainted');
+    assert.equal(canRetryWithCors(true, true), false, 'already readable');
+    assert.equal(canRetryWithCors(false, false), false, 'never loaded: no second request');
+    assert.equal(canRetryWithCors(false, true), false);
 });
 
 test('isTransparentColor recognizes every way a computed color paints nothing', () => {
