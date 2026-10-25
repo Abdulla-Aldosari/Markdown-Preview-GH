@@ -309,3 +309,73 @@ export async function pageToken(frame: Frame): Promise<string> {
         return marker.mpghTestToken;
     });
 }
+
+/** Where the border lines of a copied table lie, in image pixels, and the image pixels per css pixel. */
+export interface TableLines {
+    scale: number;
+    rows: number[];
+    cols: number[];
+}
+
+/**
+ * Finds the border lines of a copied dark-theme table: a row (or column) of
+ * pixels brighter than both row backgrounds over most of the table's length.
+ * Text is as bright but never spans a whole row. `cssWidth` is the width of
+ * the image in css pixels (the table plus the padding on both sides).
+ */
+export async function tableLines(helper: Page, png: Buffer, cssWidth: number, cssPadding: number): Promise<TableLines> {
+    return helper.evaluate(
+        async ({ base64, blockWidth, padding }) => {
+            const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+            const bitmap = await createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(bitmap, 0, 0);
+            const { width, height } = bitmap;
+            const data = context.getImageData(0, 0, width, height).data;
+            const scale = width / blockWidth;
+            const inset = Math.round(padding * scale);
+            const bright = (x: number, y: number): boolean => {
+                const o = (y * width + x) * 4;
+                return 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2] > 40;
+            };
+            const lines = (hits: number[], length: number): number[] => {
+                const found: number[] = [];
+                let previous = -10;
+                hits.forEach((count, index) => {
+                    if (count > length * 0.85) {
+                        if (index - previous > 3) {
+                            found.push(index);
+                        }
+                        previous = index;
+                    }
+                });
+                return found;
+            };
+            const rowHits: number[] = [];
+            for (let y = 0; y < height; y++) {
+                let count = 0;
+                for (let x = 0; x < width; x++) {
+                    if (bright(x, y)) {
+                        count++;
+                    }
+                }
+                rowHits.push(count);
+            }
+            const colHits: number[] = [];
+            for (let x = 0; x < width; x++) {
+                let count = 0;
+                for (let y = 0; y < height; y++) {
+                    if (bright(x, y)) {
+                        count++;
+                    }
+                }
+                colHits.push(count);
+            }
+            return { scale, rows: lines(rowHits, width - inset * 2), cols: lines(colHits, height - inset * 2) };
+        },
+        { base64: png.toString('base64'), blockWidth: cssWidth, padding: cssPadding }
+    );
+}
