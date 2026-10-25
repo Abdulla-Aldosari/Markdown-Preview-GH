@@ -567,6 +567,16 @@ otherwise add its padding outside the image), and a box that scrolls on the
 page (`overflow: auto` or `scroll`, as a wide table or code block does) is cut
 at its edge and never draws a scrollbar.
 
+The SVG document is laid out at the page's device pixel ratio (`zoom` on the
+wrapper, the SVG sized `zoom` times larger) and drawn back on the canvas at the
+block's css size. At a fractional ratio (a Windows display scale of 125%, or a
+VS Code zoom level) the page snaps every thin border to one device pixel, so a
+`1px` border is computed as `0.8px` at 125%. An image document has a ratio of 1
+and would draw that border a whole pixel wide again; every cell, whose size is
+copied from the page, would lose the difference to its border, break its text
+onto a second line, and push the bottom of the table out of the image. At the
+page's ratio the document snaps and measures exactly as the page did.
+
 Pictures are replaced by data URIs first. A loaded picture is redrawn on a
 canvas; when the canvas is locked (a picture from another origin) the picture is
 requested once more as an image with `crossOrigin = 'anonymous'`, which only a
@@ -579,7 +589,8 @@ drawn"), as is a block above the canvas limits (16384 px a side, 100 million
 pixels) or 1500 elements.
 
 The decisions live in the pure `preview/block-image-logic.mts`:
-`blockSelectors`, `headingLevel`, `sectionLength`, `planCapture` (density and
+`blockSelectors`, `headingLevel`, `sectionLength`, `layoutZoom` (the zoom of the
+image document, 1 for an unusable ratio), `planCapture` (density and
 canvas size, `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
 `isTransparentColor`, and the success and failure messages.
 
@@ -1053,6 +1064,12 @@ One test file per module, all run with `npm test`:
   table each start and end at the padding (nothing is cut on either side) and
   show no scrollbar; a section with a picture that cannot be read says so and
   the preview shows no blocked-content warning.
+- `e2e/block-image-scale.spec.ts` (fixture `fixtures/block-image-scale.md`,
+  measuring helper `tableLines`) - VS Code runs at a device scale of 1.25
+  (`--force-device-scale-factor=1.25`); three tables with two-word cells are
+  copied and the border lines found in each image give row heights and column
+  widths equal to the page's, so no cell breaks onto a second line and the
+  bottom border stays inside the image.
 - `e2e/block-image-unavailable.spec.ts` - with the built-in Markdown
   extension disabled the preview command does not exist, and running a block
   command shows the "not available" notice instead of failing silently.
