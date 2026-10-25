@@ -560,17 +560,28 @@ following sibling up to the next heading of the same or a higher rank) is
 cloned with its computed styles inlined, placed on the background color found
 by walking up from the block, wrapped in an SVG `foreignObject` of the exact
 size plus a 16 px padding, loaded as an image, and drawn on a canvas at 2x
-density (1x when 2x would exceed the canvas limits). Pictures are replaced by
-data URIs first (a loaded picture is redrawn on a canvas, a cross-origin one
-is fetched); one that cannot be read is hidden and the toast says how many
-were left out. A diagram that is still being drawn is refused ("still being
+density (1x when 2x would exceed the canvas limits). The image shows what the
+preview shows: every clone is sized as a border box (the measured rectangle is
+the border box, so a `content-box` element such as a code block or a list would
+otherwise add its padding outside the image), and a box that scrolls on the
+page (`overflow: auto` or `scroll`, as a wide table or code block does) is cut
+at its edge and never draws a scrollbar.
+
+Pictures are replaced by data URIs first. A loaded picture is redrawn on a
+canvas; when the canvas is locked (a picture from another origin) the picture is
+requested once more as an image with `crossOrigin = 'anonymous'`, which only a
+server that allows it answers. A script never fetches a picture: the preview's
+security policy forbids it, and every fetch makes the preview show "Some content
+has been disabled in this document". A picture that never loaded is not
+requested again. A picture that cannot be read is hidden and the toast says how
+many were left out. A diagram that is still being drawn is refused ("still being
 drawn"), as is a block above the canvas limits (16384 px a side, 100 million
 pixels) or 1500 elements.
 
 The decisions live in the pure `preview/block-image-logic.mts`:
 `blockSelectors`, `headingLevel`, `sectionLength`, `planCapture` (density and
-canvas size, `empty` or `tooLarge`), `isTransparentColor`, and the success and
-failure messages.
+canvas size, `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
+`isTransparentColor`, and the success and failure messages.
 
 ### preview/mermaid-theme-logic.mts
 
@@ -1011,7 +1022,8 @@ One test file per module, all run with `npm test`:
   key, and reports a failing command.
 - `test/block-image-logic.test.mts` - the selectors, heading levels, section
   boundaries, the density and canvas plan at and beyond the limits, empty and
-  invalid sizes, transparent colors, and the messages.
+  invalid sizes, which overflow values are cut, when a picture is requested
+  again with CORS, transparent colors, and the messages.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
@@ -1030,7 +1042,17 @@ One test file per module, all run with `npm test`:
   and not blank) and the page is not rebuilt (a token set on the page
   survives every copy); a block far below the visible part copies without
   moving the scroll; a section that holds a picture contains the whole
-  picture.
+  picture; a copy never opens the zoom viewer, and a viewer that a stray click
+  opened is closed before the next right click.
+- `e2e/block-image-fidelity.spec.ts` (fixture
+  `fixtures/block-image-fidelity.md`, measuring helper `analyzePng`) - the
+  copied images, in left-to-right and right-to-left previews, are measured in
+  a plain Chromium page: a tall table, a table wider than the column, a code
+  block, a code block wider than the column, a diagram, and a section holding
+  lists, a blockquote, an alert, task lists, a code block, a diagram, and a
+  table each start and end at the padding (nothing is cut on either side) and
+  show no scrollbar; a section with a picture that cannot be read says so and
+  the preview shows no blocked-content warning.
 - `e2e/block-image-unavailable.spec.ts` - with the built-in Markdown
   extension disabled the preview command does not exist, and running a block
   command shows the "not available" notice instead of failing silently.
