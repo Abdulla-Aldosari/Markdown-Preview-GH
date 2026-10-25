@@ -15,11 +15,12 @@ points in `package.json`:
 
 - `markdown.previewStyles` - stylesheets VS Code injects into every preview
   (`overrides.css`, `preview-base.css`, the theme files, the syntax
-  highlighting theme, and `image-viewer.css`).
+  highlighting theme, `image-viewer.css`, and `block-image.css`).
 - `markdown.previewScripts` - `dist/mermaid-preview.js`, a small classic
   script that runs inside the preview webview and loads the Mermaid
   library lazily from `dist/mermaid/` (see the preview script section),
-  and `dist/image-viewer.js`, the zoomable viewer of images and diagrams.
+  `dist/image-viewer.js`, the zoomable viewer of images and diagrams, and
+  `dist/block-image.js`, which copies a clicked block as a PNG image.
 - `markdown.markdownItPlugins` - lets `activate` return an
   `extendMarkdownIt(markdownIt)` function that receives the preview's Markdown-it
   instance.
@@ -120,7 +121,8 @@ The shared extension code. It is the only module with logic that imports
 - `extension-web.mts` - bundled for the browser into `dist/extension-web.js`
   (`browser` in `package.json`). It never imports a Node built-in.
 
-- `activate` registers the six commands, subscribes a configuration listener
+- `activate` registers the commands (the four block-image commands through
+  `registerBlockImageCommands`), subscribes a configuration listener
   that refreshes the preview when one of the watched setting keys
   (`colorTheme`, `contentDirection`, `contentWidth`) changes, and returns
   `{ extendMarkdownIt }`, which installs the plugin from
@@ -144,8 +146,8 @@ The shared extension code. It is the only module with logic that imports
   document's folder as the base (only for `file` documents).
 - The `Export As...` submenu of the preview context menu
   (`markdown-preview-gh.exportAs`) lists `HTML Light Theme`, `HTML Dark
-Theme`, `PDF`, and `PNG`; `PDF` is shown on desktop (`when: !isWeb`) and
-  `PNG` is declared but hidden (`when: false`). `exportHtmlCommand` writes a self-contained HTML file
+Theme`, and `PDF`; `PDF` is shown on desktop (`when: !isWeb`).
+  `exportHtmlCommand` writes a self-contained HTML file
   pinned to the chosen theme through `vscode.workspace.fs`, so it also runs
   on VS Code for the Web. An argument `{ resource, target }` skips the
   save dialog (`resolveExportTarget`); without `target`, `showSaveDialog`
@@ -158,6 +160,48 @@ Theme`, `PDF`, and `PNG`; `PDF` is shown on desktop (`when: !isWeb`) and
   browser (`announceExportedFile`), in a remote window it has no button
   because the file sits on the remote disk. Only a failed export is reported
   as an error.
+- `registerBlockImageCommands(context)` registers `Copy This Table As PNG`,
+  `Copy This Code Block As PNG`, `Copy This Diagram As PNG`, and `Copy This
+Section As PNG` over `createBlockImageController` (see
+  `block-image-command.mts`), and keeps the context key
+  `markdownPreviewGh.canCopyBlockImage` in step with the preview command
+  they depend on: it is recomputed at activation, again after 250, 1000,
+  3000, and 8000 ms (the built-in Markdown extension may finish activating
+  later), whenever `vscode.extensions.onDidChange` fires, and before every
+  copy.
+
+### block-image-protocol.mts
+
+Pure, shared by the extension and the preview script (no `vscode` import).
+It is the contract of the block-to-image copy: `blockKinds` (`table`,
+`code`, `diagram`, `section`), the context values the page writes
+(`mpghBlock`, `mpghIndex`), the availability key, the preview's internal
+command id (`_markdown.copyImage`), the command id and the label of each
+kind, `encodeCaptureId` / `decodeCaptureId` (the `mpgh-capture:<kind>:<index>`
+id that travels in the preview's `copyImage` message; any other id, the
+built-in `image-N` ones included, decodes to `null`), `readBlockRequest`
+(validates the argument VS Code passes to a block command: the resource, the
+expected kind, and a non-negative integer index), and `isCopyImageAvailable`
+(looks for the preview command in the list from `getCommands(false)`).
+
+### block-image-command.mts
+
+Pure, with the editor injected (`BlockImageHost`: `listCommands`,
+`executeCommand`, `setAvailable`, `showError`). `createBlockImageController`
+returns `refresh()` (recomputes availability and writes the context key only
+when it changed) and `copy(kind, args)`. A copy rejects a context that does
+not name its own kind, re-checks availability first and tells the user when
+the preview command is gone, runs `_markdown.copyImage` with
+`{ id: mpgh-capture:<kind>:<index>, resource }`, and reports a failing command
+with its message after re-checking availability.
+
+The preview command is internal to VS Code's Markdown extension: it posts a
+`copyImage` message to the preview page and the page's own handler ignores an
+id that is not an image element, so the id carries the request to
+`preview/block-image.mts` without rebuilding the page. When the command does
+not exist the context key is `false`, every block entry disappears from the
+context menu, and a command that still runs (a stale keybinding) shows
+`Copying as an image is not available in this version of VS Code.`
 
 ### markdown-plugin.mts
 
@@ -299,7 +343,7 @@ one export runs (`busy-guard.mts`), shows a progress notification during
 `prepareAndOpenPage`, and then shows nothing more: the progress bar
 disappears as soon as the browser was opened.
 
-### headless/ (browser engine for PDF and PNG)
+### headless/ (browser engine for PDF)
 
 Drives an installed Chromium-based browser over the Chrome DevTools Protocol
 on `--remote-debugging-pipe` (file descriptors 3 and 4): no WebSocket and no
@@ -490,6 +534,44 @@ The decisions live in two pure modules: `preview/viewer-eligibility.mts`
 and pinch math, the double-click target, and the rectangle transforms of
 the open and close animations).
 
+### preview/block-image.mts
+
+The block-to-image script, bundled into the classic script (IIFE)
+`dist/block-image.js` (`markdown.previewScripts`). It does two jobs:
+
+- **Tags the blocks.** Every table, code block (`pre` that is not a diagram),
+  diagram placeholder (`.mpgh-mermaid`), and heading inside `.mpgh-content`
+  gets `data-vscode-context='{"mpghBlock":"<kind>","mpghIndex":<n>}'`, where
+  `n` is the position among elements of that kind. The values merge with those
+  of the wrapper along the DOM path, so the menu entries test `mpghBlock` and
+  the command argument carries `resource`, `mpghBlock`, and `mpghIndex`. The
+  tagging runs on `vscode.markdown.updateContent` and on DOM mutations,
+  throttled to one animation frame, and writes an attribute only when its
+  value changed.
+- **Answers the preview's `copyImage` message.** It reads the id
+  (`decodeCaptureId`), resolves the block, draws it, waits for the focus the
+  clipboard needs (up to 5 s; the menu hands it back after it closes), writes
+  the PNG with `navigator.clipboard.write`, and shows a short toast
+  (`.mpgh-block-toast`, `role="status"`, or `role="alert"` for a failure).
+  Only one copy runs at a time.
+
+Drawing: the subject (the block, or for a section the heading and every
+following sibling up to the next heading of the same or a higher rank) is
+cloned with its computed styles inlined, placed on the background color found
+by walking up from the block, wrapped in an SVG `foreignObject` of the exact
+size plus a 16 px padding, loaded as an image, and drawn on a canvas at 2x
+density (1x when 2x would exceed the canvas limits). Pictures are replaced by
+data URIs first (a loaded picture is redrawn on a canvas, a cross-origin one
+is fetched); one that cannot be read is hidden and the toast says how many
+were left out. A diagram that is still being drawn is refused ("still being
+drawn"), as is a block above the canvas limits (16384 px a side, 100 million
+pixels) or 1500 elements.
+
+The decisions live in the pure `preview/block-image-logic.mts`:
+`blockSelectors`, `headingLevel`, `sectionLength`, `planCapture` (density and
+canvas size, `empty` or `tooLarge`), `isTransparentColor`, and the success and
+failure messages.
+
 ### preview/mermaid-theme-logic.mts
 
 The pure decision logic of the preview script, with no DOM access: the host
@@ -609,6 +691,14 @@ fade out while it flies back. The zoom cursor on images and
 diagrams appears only after the viewer script ran, and the layer is hidden
 when printing. The export page never loads it.
 
+### block-image.css
+
+The stylesheet of the toast the block-to-image script shows after a copy: a
+fixed, centered message at the bottom of the preview, colored with the editor
+widget variables VS Code defines for webviews (with fallbacks), and the error
+variant (`.is-error`) with the input-validation colors. It ignores pointer
+events. The export page never loads it.
+
 ### Naming scheme
 
 The extension's own DOM hooks use the `mpgh` prefix (classes
@@ -715,6 +805,8 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   script.
 - `dist/image-viewer.js` - the zoomable viewer script as a small IIFE
   classic script.
+- `dist/block-image.js` - the block-to-image script as a small IIFE classic
+  script.
 - `dist/mermaid-export.js` - the small export bootstrap (IIFE classic
   script) baked inline into exported pages that contain diagrams.
 - `dist/mermaid.min.js` - the official minified UMD build of the whole
@@ -752,7 +844,7 @@ Declared in `package.json` under `configuration`:
 - `markdown-preview-gh.diagnosticLogging` - boolean (default `false`):
   enables the `Markdown Preview GH` output channel for troubleshooting.
 - `markdown-preview-gh.export.browserPath` - string (default empty, machine
-  scope): the Chromium-based browser used by the PDF and PNG exports. Empty
+  scope): the Chromium-based browser used by the PDF export. Empty
   means automatic detection; in a remote window the path is on the remote
   machine.
 
@@ -762,12 +854,20 @@ and are managed by the context menu commands.
 
 ## Commands and menus
 
-Seven commands (`commands` and `webview/context` in `package.json`):
+The commands (`commands` and `webview/context` in `package.json`):
 
 - `setContentDirection`, `setContentWidth`, `setColorMode`,
   `resetPreferences` - per-file overrides via Quick Picks.
 - `openInBrowser`, `print` - standalone export to the browser.
 - `openFileOnGitHub` - opens the current file on github.com.
+- `copyTableAsPng`, `copyCodeBlockAsPng`, `copyDiagramAsPng`,
+  `copySectionAsPng` - titled `Copy This Table As PNG`, `Copy This Code Block
+As PNG`, `Copy This Diagram As PNG`, and `Copy This Section As PNG`. Each
+  entry appears only over its own kind (`mpghBlock == '<kind>'`; a section is
+  offered over its heading) while `markdownPreviewGh.canCopyBlockImage` is
+  true, and the Command Palette never lists them (`when: false`): they need a
+  clicked block. They work in every window kind because the copy happens in
+  the preview page.
 
 The context menu entries appear in the preview (`webviewId ==
 'markdown.preview' && !mpghViewer`); the export commands also appear in the
@@ -894,17 +994,46 @@ One test file per module, all run with `npm test`:
 - `test/webview-context-menu.test.mts` - the `webview/context` entries of
   `package.json`: every command outside the `Export As...` submenu is
   listed, every entry (commands and the submenu) is hidden while the viewer
-  layer is under the pointer, and the submenu holds the four formats in
-  order with PDF desktop only and PNG hidden; the PDF command is listed in
-  the Command Palette for Markdown files on desktop.
+  layer is under the pointer, the submenu holds the three formats in order
+  with PDF desktop only, no whole-document PNG export is declared, each block
+  command is titled for its block with the exact `when` clause and no Command
+  Palette entry, and the manifest, the protocol module, and the preview
+  scripts agree; the PDF command is listed in the Command Palette for
+  Markdown files on desktop.
+- `test/block-image-protocol.test.mts` - the contract: every kind has a
+  command and a label, capture ids round-trip and reject the built-in image
+  ids and every malformed one, the command argument is validated, and the
+  availability check.
+- `test/block-image-command.test.mts` - the controller with a fake host: the
+  key is written only on change and on the first refresh, a failing listing
+  counts as unavailable, a copy sends the right id, refuses a context of
+  another kind, tells the user when the command has gone and corrects the
+  key, and reports a failing command.
+- `test/block-image-logic.test.mts` - the selectors, heading levels, section
+  boundaries, the density and canvas plan at and beyond the limits, empty and
+  invalid sizes, transparent colors, and the messages.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
   `vscode`, only the desktop bundle contains the page server and the headless
-  engine, both export `activate`, the preview script and the Mermaid
-  renderer are classic scripts, the renderer bundle executes end-to-end in a
+  engine, both export `activate`, the preview script, the block image script,
+  and the Mermaid renderer are classic scripts (the block image script keeps
+  its context value, capture id, `copyImage`, and clipboard write, and no
+  extension bundle carries the page script), the renderer bundle executes end-to-end in a
   `require`-less browser-like sandbox, and the stylesheets are copied
   unchanged.
+- `e2e/block-image.spec.ts` (helpers in `e2e/block-image-helpers.mts`,
+  fixture `fixtures/block-image.md`) - a real VS Code window: the context
+  menu over a table, a code block, a diagram, and a heading offers exactly its
+  own entry and nothing over a paragraph or an alert; a click puts a real
+  image on the clipboard (checked through Electron's clipboard, with content
+  and not blank) and the page is not rebuilt (a token set on the page
+  survives every copy); a block far below the visible part copies without
+  moving the scroll; a section that holds a picture contains the whole
+  picture.
+- `e2e/block-image-unavailable.spec.ts` - with the built-in Markdown
+  extension disabled the preview command does not exist, and running a block
+  command shows the "not available" notice instead of failing silently.
 - `e2e/image-viewer.spec.ts` - a UI test that opens the built-in preview
   of `fixtures/image-viewer.md` in a real VS Code window and drives the
   viewer: image and diagram opening, the layer's context menu (built-in
