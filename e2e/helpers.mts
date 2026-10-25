@@ -43,6 +43,8 @@ export interface LaunchOptions {
     workspaceDir?: string;
     /** Written to the user's `keybindings.json`. */
     keybindings?: readonly { key: string; command: string; args?: unknown }[];
+    /** Extra command line arguments for VS Code, such as `--disable-extension=<id>`. */
+    extraArgs?: readonly string[];
 }
 
 /**
@@ -92,6 +94,7 @@ export async function launchVscode(colorTheme: string, fixtureName: string, opti
             `--user-data-dir=${userDataDir}`,
             `--extensions-dir=${extensionsDir}`,
             `--extensionDevelopmentPath=${process.cwd()}`,
+            ...(options.extraArgs ?? []),
             // Open the fixtures folder as the workspace and the chosen
             // fixture as the active file, so Quick Open can find the
             // other fixtures for tab-switch scenarios.
