@@ -38,6 +38,21 @@ export interface LaunchedVscode {
  */
 const e2eVscodeVersion = process.env.MPGH_VSCODE_VERSION ?? '1.141.2';
 
+/** How long a test waits for a toolbar button before it uses the keyboard instead. */
+export const toolbarWaitMs = 5000;
+
+/** How long VS Code may take to start and show its workbench. */
+const launchWaitMs = 5000;
+
+/** How long the preview frame and its document may take to appear once the preview is opened. */
+const previewWaitMs = 5000;
+
+/** How long every Mermaid diagram of a preview may take to draw. */
+const diagramWaitMs = 5000;
+
+/** How often the preview frame is looked for. */
+const frameProbeMs = 100;
+
 export interface LaunchOptions {
     /** Opens this folder as the workspace instead of `e2e/fixtures`. */
     workspaceDir?: string;
@@ -45,6 +60,8 @@ export interface LaunchOptions {
     keybindings?: readonly { key: string; command: string; args?: unknown }[];
     /** Extra command line arguments for VS Code, such as `--disable-extension=<id>`. */
     extraArgs?: readonly string[];
+    /** Extra user settings written next to the theme, such as the content direction of the preview. */
+    settings?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -75,6 +92,7 @@ export async function launchVscode(colorTheme: string, fixtureName: string, opti
                 'workbench.colorTheme': colorTheme,
                 'workbench.startupEditor': 'none',
                 'window.restoreWindows': 'none',
+                ...options.settings,
             },
             null,
             2
@@ -101,11 +119,18 @@ export async function launchVscode(colorTheme: string, fixtureName: string, opti
             workspaceDir,
             path.join(workspaceDir, fixtureName),
         ],
-        timeout: 120000,
+        timeout: launchWaitMs,
     });
     const page = await app.firstWindow();
+    // A fresh user-data dir opens a small default window; a maximized one
+    // shows the preview at a realistic width and keeps menus on screen.
+    await app.evaluate(({ BrowserWindow }) => {
+        const window = BrowserWindow.getAllWindows()[0];
+        window?.maximize();
+        window?.focus();
+    });
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('.monaco-workbench').waitFor({ state: 'visible', timeout: 120000 });
+    await page.locator('.monaco-workbench').waitFor({ state: 'visible', timeout: launchWaitMs });
     return { app, page, userDataDir };
 }
 
@@ -116,15 +141,16 @@ export async function launchVscode(colorTheme: string, fixtureName: string, opti
 export async function openMarkdownPreview(page: Page): Promise<Frame> {
     // The markdown editor toolbar carries the built-in preview button; the
     // Ctrl+K V keybinding is the fallback when the button is not clickable.
-    const button = page.locator('a[aria-label="Open Preview to the Side"]').first();
+    // The button label carries its keybinding and an alternative action
+    // (`Open Preview to the Side (Ctrl+K V)`), so it is matched by prefix.
+    const button = page.locator('a[aria-label^="Open Preview to the Side"]').first();
     try {
-        await button.click({ timeout: 15000 });
+        await button.click({ timeout: toolbarWaitMs });
     } catch {
         await page.keyboard.press('Control+K');
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(100);
         await page.keyboard.press('v');
     }
-    await page.waitForTimeout(1500);
 
     // The preview renders mermaid diagrams asynchronously after the content
     // arrives; wait for the document, then for every block to carry an SVG
@@ -132,8 +158,8 @@ export async function openMarkdownPreview(page: Page): Promise<Frame> {
     const frame = await findPreviewFrame(page);
     try {
         await frame.waitForFunction(() => document.querySelector('.markdown-body') !== null, undefined, {
-            timeout: 30000,
-            polling: 500,
+            timeout: previewWaitMs,
+            polling: 100,
         });
     } catch {
         console.log('PREVIEW CONTENT DEBUG:', await frame.evaluate(() => ({ bodyClass: document.body.className, innerHtml: document.body.innerHTML.slice(0, 600) })));
@@ -148,7 +174,7 @@ export async function openMarkdownPreview(page: Page): Promise<Frame> {
             return blocks.every((block) => block.querySelector('svg') !== null || block.querySelector('.mermaid-error') !== null);
         },
         undefined,
-        { timeout: 90000, polling: 500 }
+        { timeout: diagramWaitMs, polling: 100 }
     );
     return frame;
 }
@@ -157,7 +183,7 @@ async function findPreviewFrame(page: Page): Promise<Frame> {
     // The preview webview's outer frame loads a loader page; the rendered
     // document lives in its nested fake.html frame, which shares the loader's
     // origin but not its query parameters.
-    for (let attempt = 0; attempt < 60; attempt++) {
+    for (let attempt = 0; attempt < previewWaitMs / frameProbeMs; attempt++) {
         const frames = page.frames();
         const loader = frames.find((frame) => frame.url().includes('extensionId=vscode.markdown-language-features') && frame.url().includes('index.html'));
         if (loader) {
@@ -167,7 +193,7 @@ async function findPreviewFrame(page: Page): Promise<Frame> {
                 return content;
             }
         }
-        await page.waitForTimeout(500);
+        await page.waitForTimeout(frameProbeMs);
     }
     console.log('PREVIEW FRAME DEBUG:');
     for (const frame of page.frames()) {

@@ -6,7 +6,7 @@
  *-------------------------------------------------*/
 
 import { expect, test } from '@playwright/test';
-import { launchVscode } from './helpers.mts';
+import { launchVscode, toolbarWaitMs } from './helpers.mts';
 
 test.setTimeout(180000);
 
@@ -18,7 +18,7 @@ test('rendered diagrams are restored from storage when the preview tab returns',
     // test.
     const previewButton = page.locator('a[aria-label="Open Preview"]').first();
     try {
-        await previewButton.click({ timeout: 15000 });
+        await previewButton.click({ timeout: toolbarWaitMs });
     } catch {
         await page.keyboard.press('Control+K');
         await page.waitForTimeout(300);

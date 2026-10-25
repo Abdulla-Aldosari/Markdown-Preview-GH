@@ -48,6 +48,34 @@ test('each block offers its own entry and copies a real image without rebuilding
     }
 });
 
+test('a right click and a copy never open the zoom viewer, and a viewer that is open is closed first', async () => {
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
+    try {
+        const frame = await openMarkdownPreview(page);
+        await waitForTaggedPreview(frame);
+        await frame.evaluate(() => {
+            (window as unknown as { __viewerSeen: boolean }).__viewerSeen = false;
+            new MutationObserver(() => {
+                if (document.querySelector('.mpgh-viewer')) {
+                    (window as unknown as { __viewerSeen: boolean }).__viewerSeen = true;
+                }
+            }).observe(document.body, { childList: true });
+        });
+        for (const item of blockCases) {
+            await copyThrough(page, frame, item.selector, item.title);
+        }
+        expect(await frame.evaluate(() => (window as unknown as { __viewerSeen: boolean }).__viewerSeen), 'no copy may open the viewer').toBe(false);
+
+        // A viewer that a stray click opened is closed before the next right click.
+        await frame.locator('.mpgh-mermaid svg').first().click();
+        await frame.locator('.mpgh-viewer.is-open').waitFor({ state: 'attached', timeout: 5000 });
+        expect(await pngEntriesAt(page, frame, 'table >> nth=0')).toEqual(['Copy This Table As PNG']);
+        expect(await frame.locator('.mpgh-viewer').count(), 'the viewer must be closed').toBe(0);
+    } finally {
+        await app.close();
+    }
+});
+
 test('a block far below the visible part copies without moving the preview', async () => {
     const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
     try {
