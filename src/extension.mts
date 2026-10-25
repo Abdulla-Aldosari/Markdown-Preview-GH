@@ -21,6 +21,8 @@ import type { ImageSource } from './image-embedding.mts';
 import { buildGithubFileUrl, computeRelativePath, findGithubRemote, isIgnoredOrUntracked, type GithubFileLocation } from './github-url.mts';
 import { createGfmPlugin, type RenderOptions } from './markdown-plugin.mts';
 import { createBusyGuard } from './busy-guard.mts';
+import { createBlockImageController, type BlockImageController } from './block-image-command.mts';
+import { availabilityContextKey, blockCommandIds, blockKinds } from './block-image-protocol.mts';
 import type { BrowserLookup } from './headless/browser-locator.mts';
 import { describeMachine } from './headless/machine-label.mts';
 import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
@@ -196,6 +198,8 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
         vscode.commands.registerCommand('markdown-preview-gh.openFileOnGitHub', (args: unknown) => openFileOnGitHubCommand(args))
     );
 
+    registerBlockImageCommands(context);
+
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(handleActiveEditorChange),
         vscode.workspace.onDidOpenTextDocument((document) => {
@@ -217,6 +221,36 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
             return markdownIt.use(gfmPlugin);
         },
     };
+}
+
+/** The delays, in milliseconds after activation, at which the built-in preview command is looked for again. */
+const blockImageRecheckDelaysMs = [250, 1000, 3000, 8000];
+
+/**
+ * Registers the "Copy This ... As PNG" commands and keeps their menu key in
+ * step with the built-in preview command they depend on. The built-in
+ * Markdown extension may finish activating after this one, and it can be
+ * disabled while the window is open, so the key is recomputed shortly after
+ * activation and whenever the set of extensions changes; every copy checks
+ * once more before it runs.
+ */
+function registerBlockImageCommands(context: vscode.ExtensionContext): void {
+    const controller: BlockImageController = createBlockImageController({
+        listCommands: () => Promise.resolve(vscode.commands.getCommands(false)),
+        executeCommand: (id, argument) => Promise.resolve(vscode.commands.executeCommand(id, argument)),
+        setAvailable: (available) => Promise.resolve(vscode.commands.executeCommand('setContext', availabilityContextKey, available)).then(() => undefined),
+        showError: (message) => void vscode.window.showErrorMessage(message),
+    });
+    for (const kind of blockKinds) {
+        context.subscriptions.push(vscode.commands.registerCommand(blockCommandIds[kind], (args: unknown) => controller.copy(kind, args)));
+    }
+    const refresh = (): void => void controller.refresh();
+    refresh();
+    for (const delay of blockImageRecheckDelaysMs) {
+        const timer = setTimeout(refresh, delay);
+        context.subscriptions.push({ dispose: () => clearTimeout(timer) });
+    }
+    context.subscriptions.push(vscode.extensions.onDidChange(refresh));
 }
 
 /**

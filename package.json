@@ -38,7 +38,8 @@
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
       "./dist/mermaid-preview.js",
-      "./dist/image-viewer.js"
+      "./dist/image-viewer.js",
+      "./dist/block-image.js"
     ],
     "markdown.previewStyles": [
       "./dist/overrides.css",
@@ -46,7 +47,8 @@
       "./dist/theme-light.css",
       "./dist/theme-dark.css",
       "./dist/syntax-highlighting.css",
-      "./dist/image-viewer.css"
+      "./dist/image-viewer.css",
+      "./dist/block-image.css"
     ],
     "configuration": {
       "title": "Markdown Preview GH",
@@ -116,7 +118,7 @@
           "type": "string",
           "order": 4,
           "scope": "machine",
-          "markdownDescription": "Full path of the Chromium-based browser (Edge, Chrome, or Chromium) used by `Export As... > PDF` and `PNG`. Leave empty to detect an installed browser automatically. In a remote window the path is on the remote machine.",
+          "markdownDescription": "Full path of the Chromium-based browser (Edge, Chrome, or Chromium) used by `Export As... > PDF`. Leave empty to detect an installed browser automatically. In a remote window the path is on the remote machine.",
           "default": ""
         }
       }
@@ -168,9 +170,24 @@
         "category": "Markdown Preview GH: Export As"
       },
       {
-        "command": "markdown-preview-gh.exportPng",
-        "title": "PNG",
-        "category": "Markdown Preview GH: Export As"
+        "command": "markdown-preview-gh.copyTableAsPng",
+        "title": "Copy This Table As PNG",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.copyCodeBlockAsPng",
+        "title": "Copy This Code Block As PNG",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.copyDiagramAsPng",
+        "title": "Copy This Diagram As PNG",
+        "category": "Markdown Preview GH"
+      },
+      {
+        "command": "markdown-preview-gh.copySectionAsPng",
+        "title": "Copy This Section As PNG",
+        "category": "Markdown Preview GH"
       },
       {
         "command": "markdown-preview-gh.openFileOnGitHub",
@@ -198,11 +215,6 @@
           "command": "markdown-preview-gh.exportPdf",
           "when": "!isWeb",
           "group": "1_export@3"
-        },
-        {
-          "command": "markdown-preview-gh.exportPng",
-          "when": "false",
-          "group": "1_export@4"
         }
       ],
       "commandPalette": [
@@ -243,11 +255,43 @@
           "when": "editorLangId == markdown && !isWeb"
         },
         {
-          "command": "markdown-preview-gh.exportPng",
+          "command": "markdown-preview-gh.copyTableAsPng",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.copyCodeBlockAsPng",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.copyDiagramAsPng",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.copySectionAsPng",
           "when": "false"
         }
       ],
       "webview/context": [
+        {
+          "command": "markdown-preview-gh.copyTableAsPng",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && mpghBlock == 'table' && markdownPreviewGh.canCopyBlockImage",
+          "group": "z_gmpBlock@1"
+        },
+        {
+          "command": "markdown-preview-gh.copyCodeBlockAsPng",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && mpghBlock == 'code' && markdownPreviewGh.canCopyBlockImage",
+          "group": "z_gmpBlock@2"
+        },
+        {
+          "command": "markdown-preview-gh.copyDiagramAsPng",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && mpghBlock == 'diagram' && markdownPreviewGh.canCopyBlockImage",
+          "group": "z_gmpBlock@3"
+        },
+        {
+          "command": "markdown-preview-gh.copySectionAsPng",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && mpghBlock == 'section' && markdownPreviewGh.canCopyBlockImage",
+          "group": "z_gmpBlock@4"
+        },
         {
           "command": "markdown-preview-gh.openInBrowser",
           "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",

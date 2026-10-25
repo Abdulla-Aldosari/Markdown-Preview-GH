@@ -102,8 +102,9 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
         Uri: FakeUri,
         ColorThemeKind: { Light: 1, Dark: 2 },
         ProgressLocation: { Notification: 15 },
-        extensions: { getExtension: () => undefined },
+        extensions: { getExtension: () => undefined, onDidChange: () => ({ dispose: () => undefined }) },
         commands: {
+            getCommands: async () => [...commands.keys()],
             registerCommand: (id: string, handler: (args: unknown) => unknown) => {
                 commands.set(id, handler);
                 return { dispose: () => undefined };

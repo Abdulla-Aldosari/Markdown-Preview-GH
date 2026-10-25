@@ -111,6 +111,26 @@ test('the image viewer bundle is a small classic script that owns the click and 
     assert.ok(code.length < 60_000, 'the viewer script must stay small');
 });
 
+test('the block image bundle is a small classic script that tags blocks and answers the preview message', async () => {
+    const code = (await buildInMemory(false)).get('block-image.js');
+    assert.ok(code);
+    assert.match(code, /^"use strict";\n\(\(\) => \{\n/);
+    assert.match(code, /\n\}\)\(\);\n/);
+    assert.doesNotMatch(code, /^\s*(import|export)\s/m);
+    assert.match(code, /mpghBlock/, 'the context value of the menu entries must survive bundling');
+    assert.match(code, /mpgh-capture:/, 'the capture id the extension sends must survive bundling');
+    assert.match(code, /copyImage/, 'the preview message the script answers must survive bundling');
+    assert.match(code, /clipboard\.write/, 'the clipboard write must survive bundling');
+    assert.ok(code.length < 40_000, 'the block image script must stay small');
+});
+
+test('the block image logic never reaches the extension bundles through the preview script', async () => {
+    const outputs = await buildInMemory(false);
+    for (const name of ['extension.js', 'extension-web.js']) {
+        assert.doesNotMatch(outputs.get(name) ?? '', /mpgh-block-toast|getBoundingClientRect/, `${name} must not carry the page script`);
+    }
+});
+
 test('copyMermaidLibrary publishes the official ESM entry with its chunks', async () => {
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-mermaid-copy-'));
     try {

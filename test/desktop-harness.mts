@@ -36,6 +36,8 @@ export interface DesktopHarnessOptions {
     themeKind?: number;
     /** `vscode.env.remoteName`; omit for a local window. */
     remoteName?: string;
+    /** Commands of other extensions that are registered in the window, besides this extension's own. */
+    otherCommands?: readonly string[];
 }
 
 export interface DesktopHarness {
@@ -112,8 +114,9 @@ export async function activateDesktop(options: DesktopHarnessOptions): Promise<D
         Uri: DiskUri,
         ColorThemeKind: { Light: 1, Dark: 2 },
         ProgressLocation: { Notification: 15 },
-        extensions: { getExtension: () => undefined },
+        extensions: { getExtension: () => undefined, onDidChange: () => none },
         commands: {
+            getCommands: async () => [...commands.keys(), ...(options.otherCommands ?? [])],
             registerCommand: (id: string, handler: Handler) => {
                 commands.set(id, handler);
                 return none;

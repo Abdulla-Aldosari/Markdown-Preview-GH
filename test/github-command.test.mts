@@ -189,8 +189,10 @@ function createHarness(repo: FakeRepo, options: { diagnosticLogging?: boolean } 
                           exports: { enabled: true, getAPI: () => ({ getRepository: () => repo }) },
                       }
                     : undefined,
+            onDidChange: () => ({ dispose: () => {} }),
         },
         commands: {
+            getCommands: async () => [...harness.commands.keys()],
             registerCommand: (id: string, handler: (args: unknown) => unknown) => {
                 harness.commands.set(id, handler);
                 return { dispose: () => {} };
