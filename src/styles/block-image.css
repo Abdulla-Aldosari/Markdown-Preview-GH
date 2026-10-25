@@ -28,3 +28,42 @@
     background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
     color: var(--vscode-inputValidation-errorForeground, #ffffff);
 }
+
+/*
+ * The progress bar shown at the bottom of the preview while remote pictures
+ * are fetched for the copy. It sits where the message later appears.
+ */
+.mpgh-block-progress {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 1100;
+    width: min(90vw, 360px);
+    padding: 8px 16px 12px;
+    transform: translateX(-50%);
+    border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+    border-radius: 6px;
+    background: var(--vscode-editorWidget-background, #252526);
+    color: var(--vscode-editorWidget-foreground, #cccccc);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    font-size: 13px;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.mpgh-block-progress-track {
+    height: 4px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--vscode-progressBar-background, #0e70c0);
+    background: color-mix(in srgb, var(--vscode-progressBar-background, #0e70c0) 25%, transparent);
+    overflow: hidden;
+}
+
+.mpgh-block-progress-fill {
+    width: 0;
+    height: 100%;
+    background: var(--vscode-progressBar-background, #0e70c0);
+    transition: width 120ms ease-out;
+}

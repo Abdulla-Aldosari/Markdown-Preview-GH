@@ -141,7 +141,7 @@ export function planCapture(width: number, height: number, limits: { maxSide: nu
 }
 
 /** Why a block could not be copied. */
-export type FailureReason = 'gone' | 'rendering' | 'empty' | 'tooLarge' | 'tooManyNodes' | 'focus' | 'draw' | 'clipboard';
+export type FailureReason = 'gone' | 'rendering' | 'empty' | 'tooLarge' | 'tooManyNodes' | 'focus' | 'draw' | 'clipboard' | 'picture';
 
 const failureText: Readonly<Record<FailureReason, string>> = {
     gone: 'it changed before it could be copied. Try again.',
@@ -152,18 +152,46 @@ const failureText: Readonly<Record<FailureReason, string>> = {
     focus: 'the preview did not have the focus. Click the preview and try again.',
     draw: 'the image could not be drawn.',
     clipboard: 'the clipboard refused the image.',
+    picture: 'a remote picture could not be fetched.',
 };
 
-/** The message shown when the copy failed. */
-export function describeFailure(label: string, reason: FailureReason): string {
+/** The host of a picture address, or the address itself when it cannot be parsed. */
+export function pictureHost(address: string): string {
+    try {
+        return new URL(address).host || address;
+    } catch {
+        return address;
+    }
+}
+
+/**
+ * The message shown when the copy failed. `pictures` lists the addresses of the
+ * remote pictures that could not be fetched; for that reason the message names
+ * how many and from which hosts, so the user knows what to look at.
+ */
+export function describeFailure(label: string, reason: FailureReason, pictures: readonly string[] = []): string {
+    if (reason === 'picture' && pictures.length > 0) {
+        const noun = pictures.length === 1 ? 'picture' : 'pictures';
+        const hosts = [...new Set(pictures.map(pictureHost))].join(', ');
+        return `Could not copy the ${label} as an image: ${pictures.length} remote ${noun} could not be fetched (${hosts}).`;
+    }
     return `Could not copy the ${label} as an image: ${failureText[reason]}`;
 }
 
-/** The message shown when the copy worked; `missingImages` counts pictures that could not be included. */
-export function describeSuccess(label: string, missingImages: number): string {
-    if (missingImages <= 0) {
-        return `Copied the ${label} as an image.`;
+/** The message shown when the copy worked. */
+export function describeSuccess(label: string): string {
+    return `Copied the ${label} as an image.`;
+}
+
+/** The text of the progress shown while remote pictures are fetched. */
+export function describeProgress(done: number, total: number): string {
+    return `Fetching remote pictures: ${done} of ${total}`;
+}
+
+/** The share of the fetches that are finished, as a whole percentage from 0 to 100. */
+export function progressPercent(done: number, total: number): number {
+    if (!(total > 0) || !Number.isFinite(done)) {
+        return 0;
     }
-    const noun = missingImages === 1 ? 'picture' : 'pictures';
-    return `Copied the ${label} as an image, without ${missingImages} ${noun} that could not be read.`;
+    return Math.round(Math.min(Math.max(done / total, 0), 1) * 100);
 }

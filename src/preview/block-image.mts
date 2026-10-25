@@ -32,11 +32,13 @@ import {
     capturePadding,
     clipsOverflow,
     describeFailure,
+    describeProgress,
     describeSuccess,
     isTransparentColor,
     layoutZoom,
     maxCaptureNodes,
     planCapture,
+    progressPercent,
     sectionLength,
     type FailureReason,
 } from './block-image-logic.mts';
@@ -45,6 +47,7 @@ const updateEvent = 'vscode.markdown.updateContent';
 const contentSelector = '.mpgh-content';
 const contextAttribute = 'data-vscode-context';
 const toastClass = 'mpgh-block-toast';
+const progressClass = 'mpgh-block-progress';
 const xhtmlNamespace = 'http://www.w3.org/1999/xhtml';
 const svgNamespace = 'http://www.w3.org/2000/svg';
 /** How long the page waits for the focus the clipboard needs after the menu closes. */
@@ -57,10 +60,13 @@ const errorToastMs = 6000;
 /** A copy that failed for a reason the user is told about. */
 class CopyFailure extends Error {
     readonly reason: FailureReason;
+    /** The addresses of the pictures that could not be fetched (reason `picture`). */
+    readonly pictures: readonly string[];
 
-    constructor(reason: FailureReason) {
+    constructor(reason: FailureReason, pictures: readonly string[] = []) {
         super(reason);
         this.reason = reason;
+        this.pictures = pictures;
     }
 }
 
@@ -183,17 +189,17 @@ function readWithCors(source: string): Promise<string | null> {
  * preview forbids it, and every attempt would be reported to the user as
  * blocked content.
  */
-async function imageToDataUrl(image: HTMLImageElement): Promise<string | null> {
-    const source = image.currentSrc || image.src;
+function pictureSource(image: HTMLImageElement): string {
+    return image.currentSrc || image.src;
+}
+
+/** The pixels of a picture the page can already read (an embedded one, or one on a canvas that stays unlocked), or `null`. */
+function readDirect(image: HTMLImageElement): string | null {
+    const source = pictureSource(image);
     if (source.startsWith('data:')) {
         return source;
     }
-    const loaded = image.complete && image.naturalWidth > 0;
-    const direct = loaded ? readPixels(image) : null;
-    if (direct) {
-        return direct;
-    }
-    return canRetryWithCors(loaded, false) ? readWithCors(source) : null;
+    return image.complete && image.naturalWidth > 0 ? readPixels(image) : null;
 }
 
 /** The pictures of an element, or the element itself when it is one. */
@@ -203,10 +209,12 @@ function picturesOf(element: Element): HTMLImageElement[] {
 }
 
 /**
- * Replaces the pictures of the clone by data URIs and returns how many could
- * not be read; those are left out of the image instead of showing a broken one.
+ * Replaces the pictures of the clone by data URIs. A picture whose pixels are
+ * locked (it came from another origin) is requested once more with CORS while a
+ * progress bar tells the user the copy is working. One picture that cannot be
+ * read fails the whole copy: the image is complete or it is not made.
  */
-async function embedPictures(sources: readonly Element[], clones: readonly Element[]): Promise<number> {
+async function embedPictures(sources: readonly Element[], clones: readonly Element[]): Promise<void> {
     const pairs: Array<[HTMLImageElement, HTMLImageElement]> = [];
     sources.forEach((source, position) => {
         const cloned = picturesOf(clones[position]);
@@ -216,22 +224,45 @@ async function embedPictures(sources: readonly Element[], clones: readonly Eleme
             }
         });
     });
-    let missing = 0;
-    await Promise.all(
-        pairs.map(async ([source, clone]) => {
-            const url = await imageToDataUrl(source);
-            clone.removeAttribute('srcset');
-            clone.removeAttribute('data-src');
-            if (url) {
-                clone.setAttribute('src', url);
-            } else {
-                clone.removeAttribute('src');
-                clone.style.visibility = 'hidden';
-                missing++;
-            }
-        })
-    );
-    return missing;
+    const unreadable: string[] = [];
+    const remote: Array<[HTMLImageElement, HTMLImageElement]> = [];
+    for (const [source, clone] of pairs) {
+        clone.removeAttribute('srcset');
+        clone.removeAttribute('data-src');
+        const direct = readDirect(source);
+        if (direct) {
+            clone.setAttribute('src', direct);
+        } else if (canRetryWithCors(source.complete && source.naturalWidth > 0, false)) {
+            remote.push([source, clone]);
+        } else {
+            // A picture that never loaded is not requested again: a second request would only repeat what the preview already reported.
+            unreadable.push(pictureSource(source));
+        }
+    }
+    if (remote.length > 0) {
+        const progress = showProgress(remote.length);
+        try {
+            let done = 0;
+            await Promise.all(
+                remote.map(async ([source, clone]) => {
+                    const address = pictureSource(source);
+                    const url = await readWithCors(address);
+                    if (url) {
+                        clone.setAttribute('src', url);
+                    } else {
+                        unreadable.push(address);
+                    }
+                    done++;
+                    progress.update(done);
+                })
+            );
+        } finally {
+            progress.remove();
+        }
+    }
+    if (unreadable.length > 0) {
+        throw new CopyFailure('picture', unreadable);
+    }
 }
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -245,7 +276,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 
 interface DrawnBlock {
     blob: Blob;
-    missingPictures: number;
 }
 
 /**
@@ -298,7 +328,7 @@ async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
     }
     const zoom = layoutZoom(window.devicePixelRatio);
     const { wrapper, clones } = buildCaptureTree(subject, rects, width, height, zoom);
-    const missingPictures = await embedPictures(subject, clones);
+    await embedPictures(subject, clones);
     const markup = new XMLSerializer().serializeToString(wrapper);
     // The document is `zoom` times larger than the block; it is drawn back at the block's css size.
     const svgWidth = Math.ceil(width * zoom);
@@ -324,7 +354,7 @@ async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
     if (!blob) {
         throw new CopyFailure('draw');
     }
-    return { blob, missingPictures };
+    return { blob };
 }
 
 /** The color painted behind the subject: the first background found going up from its parent. */
@@ -366,6 +396,39 @@ function showToast(message: string, failed: boolean): void {
     window.setTimeout(() => toast.remove(), failed ? errorToastMs : infoToastMs);
 }
 
+/**
+ * A bar at the bottom of the preview while remote pictures are fetched, so the
+ * user can tell the copy is working. It is a progress bar for assistive
+ * technology too (`role="progressbar"`), and a new one replaces the old.
+ */
+function showProgress(total: number): { update: (done: number) => void; remove: () => void } {
+    document.querySelector(`.${progressClass}`)?.remove();
+    const root = document.createElement('div');
+    root.className = progressClass;
+    root.setAttribute('role', 'progressbar');
+    root.setAttribute('aria-valuemin', '0');
+    root.setAttribute('aria-valuemax', String(total));
+    const label = document.createElement('div');
+    label.className = `${progressClass}-label`;
+    const track = document.createElement('div');
+    track.className = `${progressClass}-track`;
+    const fill = document.createElement('div');
+    fill.className = `${progressClass}-fill`;
+    track.append(fill);
+    root.append(label, track);
+    const update = (done: number): void => {
+        const text = describeProgress(done, total);
+        label.textContent = text;
+        root.setAttribute('aria-valuenow', String(done));
+        root.setAttribute('aria-valuetext', text);
+        root.setAttribute('data-done', String(done));
+        fill.style.width = `${progressPercent(done, total)}%`;
+    };
+    update(0);
+    document.body.append(root);
+    return { update, remove: () => root.remove() };
+}
+
 let copying = false;
 
 async function copyBlock(target: CaptureTarget): Promise<void> {
@@ -384,9 +447,10 @@ async function copyBlock(target: CaptureTarget): Promise<void> {
         } catch {
             throw new CopyFailure('clipboard');
         }
-        showToast(describeSuccess(label, drawn.missingPictures), false);
+        showToast(describeSuccess(label), false);
     } catch (error) {
-        showToast(describeFailure(label, error instanceof CopyFailure ? error.reason : 'draw'), true);
+        const failure = error instanceof CopyFailure ? error : new CopyFailure('draw');
+        showToast(describeFailure(label, failure.reason, failure.pictures), true);
     } finally {
         copying = false;
     }
