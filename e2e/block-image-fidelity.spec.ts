@@ -81,10 +81,13 @@ for (const direction of ['ltr', 'rtl'] as const) {
             }
             expect(problems, `${direction}: problems found in the copied images`).toEqual([]);
 
-            // A picture that cannot be read is left out and said so, without the preview blocking anything.
+            // A picture that cannot be fetched fails the whole copy, without the preview blocking anything.
             await app.evaluate(({ clipboard }) => clipboard.clear());
             await copyThrough(page, frame, 'h2:has-text("Remote Picture Section")', 'Copy This Section As PNG');
-            expect(await frame.locator('.mpgh-block-toast').textContent()).toBe('Copied the section as an image, without 1 picture that could not be read.');
+            expect(await frame.locator('.mpgh-block-toast').textContent()).toBe(
+                'Could not copy the section as an image: 1 remote picture could not be fetched (mpgh-test.invalid).'
+            );
+            expect(await readClipboardPng(app), 'a failed copy leaves the clipboard untouched').toBeNull();
             await page.waitForTimeout(500);
             expect(await frame.locator('#code-csp-warning').count(), 'the preview must not report blocked content').toBe(0);
         } finally {
