@@ -61,6 +61,12 @@ const baseScopes = [
         ['src/preview/image-viewer.mts', 'src/preview/viewer-geometry.mts', 'src/preview/viewer-eligibility.mts', 'src/styles/image-viewer.css'],
     ],
 
+    [
+        'blockImage',
+        'copying a clicked block of the preview (table, code block, diagram, section) to the clipboard as a PNG image: the shared contract, the extension-side controller, the preview script and its pure logic, and the toast stylesheet',
+        ['src/block-image-protocol.mts', 'src/block-image-command.mts', 'src/preview/block-image.mts', 'src/preview/block-image-logic.mts', 'src/styles/block-image.css'],
+    ],
+
     // Theme pipeline (build/)
     ['palettes', 'the committed variable snapshot', ['build/palettes/']],
     ['syncThemes', 'the online fetch phase that rewrites the snapshot', ['build/sync-themes.mts']],
