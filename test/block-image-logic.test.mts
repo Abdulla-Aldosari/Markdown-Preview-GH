@@ -14,11 +14,14 @@ import {
     canvasLimits,
     clipsOverflow,
     describeFailure,
+    describeProgress,
     describeSuccess,
     headingLevel,
     isTransparentColor,
     layoutZoom,
+    pictureHost,
     planCapture,
+    progressPercent,
     sectionLength,
 } from '../src/preview/block-image-logic.mts';
 
@@ -167,7 +170,41 @@ test('isTransparentColor keeps every color that paints something', () => {
 test('the messages name the block and the cause', () => {
     assert.equal(describeFailure('table', 'tooLarge'), 'Could not copy the table as an image: it is too large to copy as one image.');
     assert.match(describeFailure('code block', 'focus'), /^Could not copy the code block as an image: .*click the preview/i);
-    assert.equal(describeSuccess('diagram', 0), 'Copied the diagram as an image.');
-    assert.equal(describeSuccess('section', 1), 'Copied the section as an image, without 1 picture that could not be read.');
-    assert.equal(describeSuccess('section', 3), 'Copied the section as an image, without 3 pictures that could not be read.');
+    assert.equal(describeSuccess('diagram'), 'Copied the diagram as an image.');
+});
+
+test('a failed remote picture names how many and from which hosts', () => {
+    assert.equal(
+        describeFailure('section', 'picture', ['https://media.askvg.com/a/b.png']),
+        'Could not copy the section as an image: 1 remote picture could not be fetched (media.askvg.com).'
+    );
+    assert.equal(
+        describeFailure('section', 'picture', ['https://a.example/x.png', 'https://a.example/y.png', 'https://b.example/z.png']),
+        'Could not copy the section as an image: 3 remote pictures could not be fetched (a.example, b.example).'
+    );
+});
+
+test('a picture failure without addresses still has a message', () => {
+    assert.equal(describeFailure('table', 'picture'), 'Could not copy the table as an image: a remote picture could not be fetched.');
+});
+
+test('pictureHost reads the host and keeps an unparsable address as it is', () => {
+    assert.equal(pictureHost('https://raw.githubusercontent.com/a/b.png'), 'raw.githubusercontent.com');
+    assert.equal(pictureHost('http://127.0.0.1:8080/x.png'), '127.0.0.1:8080');
+    assert.equal(pictureHost('not an address'), 'not an address');
+});
+
+test('the progress text and percentage follow the finished fetches', () => {
+    assert.equal(describeProgress(0, 3), 'Fetching remote pictures: 0 of 3');
+    assert.equal(describeProgress(3, 3), 'Fetching remote pictures: 3 of 3');
+    assert.equal(progressPercent(0, 4), 0);
+    assert.equal(progressPercent(1, 3), 33);
+    assert.equal(progressPercent(4, 4), 100);
+});
+
+test('progressPercent stays within 0 to 100 and survives unusable input', () => {
+    assert.equal(progressPercent(9, 3), 100);
+    assert.equal(progressPercent(-2, 3), 0);
+    assert.equal(progressPercent(1, 0), 0);
+    assert.equal(progressPercent(Number.NaN, 3), 0);
 });
