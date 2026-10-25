@@ -1,0 +1,30 @@
+/*
+ * The short message the preview shows after "Copy This ... As PNG". It is
+ * appended to the body by dist/block-image.js, outside the content the preview
+ * rewrites, and takes its colors from the same theme variables as the viewer
+ * (the page-level fallbacks keep it readable before a theme applies).
+ */
+.mpgh-block-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    z-index: 1100;
+    max-width: min(90vw, 560px);
+    padding: 8px 16px;
+    transform: translateX(-50%);
+    border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+    border-radius: 6px;
+    background: var(--vscode-editorWidget-background, #252526);
+    color: var(--vscode-editorWidget-foreground, #cccccc);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    font-size: 13px;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+.mpgh-block-toast.is-error {
+    border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+    background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+    color: var(--vscode-inputValidation-errorForeground, #ffffff);
+}

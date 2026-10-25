@@ -23,6 +23,11 @@
  * - `dist/image-viewer.js`: the zoomable viewer script, a small classic script
  *   (IIFE) injected into the preview webview. A click on an image or a
  *   rendered diagram opens it in a modal layer with zoom and pan.
+ * - `dist/block-image.js`: the block-to-image script, a small classic script
+ *   (IIFE) injected into the preview webview. It marks tables, code blocks,
+ *   diagrams, and headings for the context menu and, when the extension asks
+ *   through the preview's `copyImage` message, copies that block to the
+ *   clipboard as a PNG image.
  * - `dist/mermaid-preview-vendor.js`: the whole Mermaid library as a classic
  *   script (IIFE) exposing `window.MermaidVendor`. Loaded on demand by the
  *   preview script, only when diagrams exist.
@@ -49,7 +54,7 @@ import * as esbuild from 'esbuild';
 const rootDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Hand-written stylesheets copied verbatim into `dist/`. */
-export const STATIC_STYLESHEETS: readonly string[] = ['overrides.css', 'syntax-highlighting.css', 'image-viewer.css'];
+export const STATIC_STYLESHEETS: readonly string[] = ['overrides.css', 'syntax-highlighting.css', 'image-viewer.css', 'block-image.css'];
 
 export interface BundleOptions {
     /** Minify and omit source maps. */
@@ -97,6 +102,13 @@ export function createBuildOptions({ production, outDir }: BundleOptions): esbui
             ...shared,
             entryPoints: [path.join(rootDir, 'src', 'preview', 'image-viewer.mts')],
             outfile: path.join(outDir, 'image-viewer.js'),
+            format: 'iife',
+            platform: 'browser',
+        },
+        {
+            ...shared,
+            entryPoints: [path.join(rootDir, 'src', 'preview', 'block-image.mts')],
+            outfile: path.join(outDir, 'block-image.js'),
             format: 'iife',
             platform: 'browser',
         },
