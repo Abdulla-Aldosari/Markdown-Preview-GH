@@ -16,7 +16,16 @@
  * re-checks it so a stale key never turns into a silent failure.
  */
 
-import { blockLabels, copyImageCommandId, encodeCaptureId, isCopyImageAvailable, readBlockRequest, type BlockKind } from './block-image-protocol.mts';
+import {
+    blockLabels,
+    copyImageCommandId,
+    defaultBlockImageScale,
+    encodeCaptureId,
+    isCopyImageAvailable,
+    readBlockRequest,
+    type BlockImageScale,
+    type BlockKind,
+} from './block-image-protocol.mts';
 
 /** What the controller needs from the editor. */
 export interface BlockImageHost {
@@ -27,6 +36,18 @@ export interface BlockImageHost {
     /** Sets the context key the menu entries test. */
     setAvailable(available: boolean): Promise<void>;
     showError(message: string): void;
+    /** The scale the image is made at, from the settings. */
+    readScale(): BlockImageScale;
+    /** Whether the user wrote a value for the scale setting, even one equal to the default. */
+    isScaleExplicit(): boolean;
+    /** Whether the one-time notice about the scale was already shown. */
+    scaleNoticeShown(): boolean;
+    /** Remembers that the notice was shown, for good. */
+    markScaleNoticeShown(): Promise<void>;
+    /** Shows the notice with one action; resolves to true when the action was chosen. */
+    showScaleNotice(message: string, action: string): Promise<boolean>;
+    /** Opens the settings at the scale setting. */
+    openScaleSettings(): Promise<void>;
 }
 
 export interface BlockImageController {
@@ -37,6 +58,10 @@ export interface BlockImageController {
 }
 
 export const unavailableMessage = 'Copying as an image is not available in this version of VS Code.';
+
+/** The one-time notice shown after a copy at the default scale, and its action. */
+export const scaleNoticeMessage = 'Block images are copied at their actual size (scale 1). To make them larger, change "Block Image Scale" in the settings.';
+export const scaleNoticeAction = 'Open Settings';
 
 export function createBlockImageController(host: BlockImageHost): BlockImageController {
     let known: boolean | undefined;
@@ -55,6 +80,28 @@ export function createBlockImageController(host: BlockImageHost): BlockImageCont
         return available;
     }
 
+    /**
+     * Tells the user once that images are made at the actual size and where to
+     * change it. The notice is for someone who never touched the setting, and it
+     * is remembered before it is shown, so it never comes back. The reply of the
+     * user is not waited for: the copy is already done.
+     */
+    async function announceScale(scale: BlockImageScale): Promise<void> {
+        if (scale !== defaultBlockImageScale || host.isScaleExplicit() || host.scaleNoticeShown()) {
+            return;
+        }
+        try {
+            await host.markScaleNoticeShown();
+        } catch {
+            // A notice that cannot be remembered would come back at every copy, so it is not shown; the copy itself is done.
+            return;
+        }
+        void host
+            .showScaleNotice(scaleNoticeMessage, scaleNoticeAction)
+            .then((chosen) => (chosen ? host.openScaleSettings() : undefined))
+            .catch(() => undefined);
+    }
+
     async function copy(kind: BlockKind, args: unknown): Promise<void> {
         const label = blockLabels[kind];
         const request = readBlockRequest(args, kind);
@@ -66,13 +113,16 @@ export function createBlockImageController(host: BlockImageHost): BlockImageCont
             host.showError(unavailableMessage);
             return;
         }
+        const scale = host.readScale();
         try {
-            await host.executeCommand(copyImageCommandId, { id: encodeCaptureId(request), resource: request.resource });
+            await host.executeCommand(copyImageCommandId, { id: encodeCaptureId(request, scale), resource: request.resource });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             host.showError(`Could not copy the ${label} as an image: ${message}`);
             await refresh();
+            return;
         }
+        await announceScale(scale);
     }
 
     return { refresh, copy };

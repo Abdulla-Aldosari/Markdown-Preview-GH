@@ -11,7 +11,7 @@
  * what the user is told. No DOM access, so it is unit-testable in plain Node.
  */
 
-import type { BlockKind } from '../block-image-protocol.mts';
+import { blockImageScales, type BlockImageScale, type BlockKind } from '../block-image-protocol.mts';
 
 /** The elements that count as a block of each kind, relative to the preview content. */
 export const blockSelectors: Readonly<Record<BlockKind, string>> = {
@@ -29,9 +29,6 @@ export const maxCaptureNodes = 1500;
 
 /** The largest canvas the copy draws; larger blocks are refused instead of cut. */
 export const canvasLimits = { maxSide: 16384, maxArea: 100_000_000 } as const;
-
-/** The pixel densities to try, sharpest first. */
-export const captureScales = [2, 1] as const;
 
 /**
  * The zoom the image document is laid out at: the device pixel ratio of the
@@ -125,12 +122,17 @@ export interface CapturePlan {
 
 export type PlanResult = { ok: true; plan: CapturePlan } | { ok: false; reason: 'empty' | 'tooLarge' };
 
-/** Picks the sharpest density whose canvas stays within the limits. */
-export function planCapture(width: number, height: number, limits: { maxSide: number; maxArea: number } = canvasLimits): PlanResult {
+/**
+ * Picks the density of the image: the requested scale when its canvas stays
+ * within the limits, otherwise the next smaller scale that does. A block that
+ * does not fit even at the actual size (1) is refused.
+ */
+export function planCapture(width: number, height: number, requested: BlockImageScale, limits: { maxSide: number; maxArea: number } = canvasLimits): PlanResult {
     if (!(Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0)) {
         return { ok: false, reason: 'empty' };
     }
-    for (const scale of captureScales) {
+    const candidates = [...blockImageScales].filter((scale) => scale <= requested).reverse();
+    for (const scale of candidates.length > 0 ? candidates : [1]) {
         const canvasWidth = Math.ceil(width * scale);
         const canvasHeight = Math.ceil(height * scale);
         if (canvasWidth <= limits.maxSide && canvasHeight <= limits.maxSide && canvasWidth * canvasHeight <= limits.maxArea) {

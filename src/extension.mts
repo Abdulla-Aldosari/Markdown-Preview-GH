@@ -28,7 +28,16 @@ import { describeMachine } from './headless/machine-label.mts';
 import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
 import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
-import { CONFIG_SECTION, CONTENT_DIRECTIONS, CONTENT_WIDTHS, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
+import {
+    BLOCK_IMAGE_SCALE_KEY,
+    CONFIG_SECTION,
+    CONTENT_DIRECTIONS,
+    CONTENT_WIDTHS,
+    isSettingExplicit,
+    readImageSettings,
+    readLayoutSettings,
+    readThemeSettings,
+} from './preview-settings.mts';
 
 type CommandArgs = { resource?: string } | undefined;
 
@@ -226,6 +235,9 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
 /** The delays, in milliseconds after activation, at which the built-in preview command is looked for again. */
 const blockImageRecheckDelaysMs = [250, 1000, 3000, 8000];
 
+/** The key (in the global state) that remembers the one-time notice about the image scale. */
+const blockImageScaleNoticeKey = 'markdown-preview-gh.blockImageScaleNoticeShown';
+
 /**
  * Registers the "Copy This ... As PNG" commands and keeps their menu key in
  * step with the built-in preview command they depend on. The built-in
@@ -240,6 +252,13 @@ function registerBlockImageCommands(context: vscode.ExtensionContext): void {
         executeCommand: (id, argument) => Promise.resolve(vscode.commands.executeCommand(id, argument)),
         setAvailable: (available) => Promise.resolve(vscode.commands.executeCommand('setContext', availabilityContextKey, available)).then(() => undefined),
         showError: (message) => void vscode.window.showErrorMessage(message),
+        readScale: () => readImageSettings(readConfiguration()).scale,
+        isScaleExplicit: () => isSettingExplicit(readConfiguration(), BLOCK_IMAGE_SCALE_KEY),
+        scaleNoticeShown: () => context.globalState.get<boolean>(blockImageScaleNoticeKey, false),
+        markScaleNoticeShown: () => Promise.resolve(context.globalState.update(blockImageScaleNoticeKey, true)),
+        showScaleNotice: async (message, action) => (await vscode.window.showInformationMessage(message, action)) === action,
+        openScaleSettings: () =>
+            Promise.resolve(vscode.commands.executeCommand('workbench.action.openSettings', `${CONFIG_SECTION}.${BLOCK_IMAGE_SCALE_KEY}`)).then(() => undefined),
     });
     for (const kind of blockKinds) {
         context.subscriptions.push(vscode.commands.registerCommand(blockCommandIds[kind], (args: unknown) => controller.copy(kind, args)));

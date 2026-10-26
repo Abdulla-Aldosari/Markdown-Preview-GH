@@ -52,12 +52,29 @@ export const blockLabels: Readonly<Record<BlockKind, string>> = {
     section: 'section',
 };
 
-const captureIdPattern = new RegExp(`^mpgh-capture:(${blockKinds.join('|')}):(\\d{1,9})$`);
+/** The scales an image can be made at: how many image pixels one css pixel of the block becomes. */
+export const blockImageScales = [1, 1.5, 2, 2.5, 3] as const;
+
+export type BlockImageScale = (typeof blockImageScales)[number];
+
+/** The scale used when the setting holds nothing usable: the actual size of the block. */
+export const defaultBlockImageScale: BlockImageScale = 1;
+
+export function isBlockImageScale(value: unknown): value is BlockImageScale {
+    return typeof value === 'number' && (blockImageScales as readonly number[]).includes(value);
+}
+
+const captureIdPattern = new RegExp(`^mpgh-capture:(${blockKinds.join('|')}):(\\d{1,9}):(\\d(?:\\.\\d)?)$`);
 
 /** What the page needs to find the block: its kind and its position among that kind. */
 export interface CaptureTarget {
     kind: BlockKind;
     index: number;
+}
+
+/** What the page needs to make the image: the block, and the scale of the image. */
+export interface CaptureCommand extends CaptureTarget {
+    scale: BlockImageScale;
 }
 
 /** What a command needs: the document, and the block that was clicked. */
@@ -69,21 +86,22 @@ export function isBlockKind(value: unknown): value is BlockKind {
     return typeof value === 'string' && (blockKinds as readonly string[]).includes(value);
 }
 
-/** The `id` the host sends so that the page captures this block. */
-export function encodeCaptureId(target: CaptureTarget): string {
-    return `mpgh-capture:${target.kind}:${target.index}`;
+/** The `id` the host sends so that the page captures this block at this scale. */
+export function encodeCaptureId(target: CaptureTarget, scale: BlockImageScale): string {
+    return `mpgh-capture:${target.kind}:${target.index}:${scale}`;
 }
 
-/** The block a `copyImage` message names, or `null` for any other id (the built-in image ids included). */
-export function decodeCaptureId(id: unknown): CaptureTarget | null {
+/** The block and scale a `copyImage` message names, or `null` for any other id (the built-in image ids included). */
+export function decodeCaptureId(id: unknown): CaptureCommand | null {
     if (typeof id !== 'string') {
         return null;
     }
     const match = captureIdPattern.exec(id);
-    if (!match || !isBlockKind(match[1])) {
+    const scale = match ? Number(match[3]) : Number.NaN;
+    if (!match || !isBlockKind(match[1]) || !isBlockImageScale(scale)) {
         return null;
     }
-    return { kind: match[1], index: Number(match[2]) };
+    return { kind: match[1], index: Number(match[2]), scale };
 }
 
 /**

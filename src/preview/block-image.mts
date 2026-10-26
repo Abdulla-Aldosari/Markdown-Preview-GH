@@ -25,7 +25,17 @@
  * messages) live in the pure `block-image-logic` module.
  */
 
-import { blockContextKey, blockIndexContextKey, blockKinds, blockLabels, decodeCaptureId, type BlockKind, type CaptureTarget } from '../block-image-protocol.mts';
+import {
+    blockContextKey,
+    blockIndexContextKey,
+    blockKinds,
+    blockLabels,
+    decodeCaptureId,
+    type BlockImageScale,
+    type BlockKind,
+    type CaptureCommand,
+    type CaptureTarget,
+} from '../block-image-protocol.mts';
 import {
     blockSelectors,
     canRetryWithCors,
@@ -322,7 +332,7 @@ function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[]
 }
 
 /** Draws the subject on a canvas and returns it as a PNG. */
-async function drawSubject(subject: readonly Element[], progress: ProgressSlot): Promise<DrawnBlock> {
+async function drawSubject(subject: readonly Element[], scale: BlockImageScale, progress: ProgressSlot): Promise<DrawnBlock> {
     if (hasPendingDiagram(subject)) {
         throw new CopyFailure('rendering');
     }
@@ -331,7 +341,7 @@ async function drawSubject(subject: readonly Element[], progress: ProgressSlot):
     const contentHeight = Math.max(...rects.map((rect) => rect.bottom)) - Math.min(...rects.map((rect) => rect.top));
     const width = Math.ceil(contentWidth + capturePadding * 2);
     const height = Math.ceil(contentHeight + capturePadding * 2);
-    const planned = planCapture(width, height);
+    const planned = planCapture(width, height, scale);
     if (!planned.ok) {
         throw new CopyFailure(planned.reason);
     }
@@ -482,7 +492,7 @@ async function holdProgress(progress: ProgressSlot): Promise<void> {
 
 let copying = false;
 
-async function copyBlock(target: CaptureTarget): Promise<void> {
+async function copyBlock(target: CaptureCommand): Promise<void> {
     const label = blockLabels[target.kind];
     if (copying) {
         return;
@@ -492,7 +502,7 @@ async function copyBlock(target: CaptureTarget): Promise<void> {
     // place, so the wait for the drawing and the clipboard is not left silent.
     const progress: ProgressSlot = { current: null };
     try {
-        const drawn = await drawSubject(resolveSubject(target), progress);
+        const drawn = await drawSubject(resolveSubject(target), target.scale, progress);
         if (!(await waitForFocus())) {
             throw new CopyFailure('focus');
         }
