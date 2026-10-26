@@ -177,9 +177,11 @@ It is the contract of the block-to-image copy: `blockKinds` (`table`,
 `code`, `diagram`, `section`), the context values the page writes
 (`mpghBlock`, `mpghIndex`), the availability key, the preview's internal
 command id (`_markdown.copyImage`), the command id and the label of each
-kind, `encodeCaptureId` / `decodeCaptureId` (the `mpgh-capture:<kind>:<index>`
-id that travels in the preview's `copyImage` message; any other id, the
-built-in `image-N` ones included, decodes to `null`), `readBlockRequest`
+kind, the image scales (`blockImageScales` = 1, 1.5, 2, 2.5, 3,
+`defaultBlockImageScale` = 1, `isBlockImageScale`), `encodeCaptureId` /
+`decodeCaptureId` (the `mpgh-capture:<kind>:<index>:<scale>` id that travels in
+the preview's `copyImage` message; any other id, the built-in `image-N` ones
+and an id with a scale outside the list included, decodes to `null`), `readBlockRequest`
 (validates the argument VS Code passes to a block command: the resource, the
 expected kind, and a non-negative integer index), and `isCopyImageAvailable`
 (looks for the preview command in the list from `getCommands(false)`).
@@ -187,13 +189,26 @@ expected kind, and a non-negative integer index), and `isCopyImageAvailable`
 ### block-image-command.mts
 
 Pure, with the editor injected (`BlockImageHost`: `listCommands`,
-`executeCommand`, `setAvailable`, `showError`). `createBlockImageController`
+`executeCommand`, `setAvailable`, `showError`, `readScale`, and the notice
+hooks `isScaleExplicit`, `scaleNoticeShown`, `markScaleNoticeShown`,
+`showScaleNotice`, `openScaleSettings`). `createBlockImageController`
 returns `refresh()` (recomputes availability and writes the context key only
 when it changed) and `copy(kind, args)`. A copy rejects a context that does
 not name its own kind, re-checks availability first and tells the user when
 the preview command is gone, runs `_markdown.copyImage` with
-`{ id: mpgh-capture:<kind>:<index>, resource }`, and reports a failing command
-with its message after re-checking availability.
+`{ id: mpgh-capture:<kind>:<index>:<scale>, resource }` (the scale is read from
+the setting at every copy), and reports a failing command with its message
+after re-checking availability.
+
+After a copy that worked at the default scale (1), the controller shows a
+one-time information notice ("Block images are copied at their actual size
+(scale 1). To make them larger, change \"Block Image Scale\" in the settings.",
+with an `Open Settings` action that opens the setting). The notice is only for a
+user who never wrote the setting (`isSettingExplicit`: user, workspace, or
+folder value, even one equal to the default, counts as written), it is
+remembered in `globalState` (`markdown-preview-gh.blockImageScaleNoticeShown`)
+before it is shown, and a notice that cannot be remembered is not shown. The
+reply of the user is not waited for.
 
 The preview command is internal to VS Code's Markdown extension: it posts a
 `copyImage` message to the preview page and the page's own handler ignores an
@@ -228,7 +243,11 @@ Pure configuration reader, unit-tested without a `vscode` mock. It exports
 `CONFIG_SECTION`, the valid value lists (`THEME_MODES`,
 `CONTENT_DIRECTIONS`, `CONTENT_WIDTHS`), the validation helper `pick`, and
 the readers `readThemeSettings(configuration)` (returns `{ mode }`) and
-`readLayoutSettings(configuration)` (returns `{ direction, width }`). The
+`readLayoutSettings(configuration)` (returns `{ direction, width }`), and
+`readImageSettings(configuration)` (returns `{ scale }`: one of the allowed
+block image scales, the actual size 1 for anything else, a number written as
+text included). `isSettingExplicit(configuration, key)` tells whether the user
+wrote a value at any level (it needs `inspect`, `InspectableConfiguration`). The
 configuration object is injected through its `get(key)` method
 (`ConfigurationReader`).
 
@@ -549,7 +568,8 @@ The block-to-image script, bundled into the classic script (IIFE)
   throttled to one animation frame, and writes an attribute only when its
   value changed.
 - **Answers the preview's `copyImage` message.** It reads the id
-  (`decodeCaptureId`), resolves the block, draws it, waits for the focus the
+  (`decodeCaptureId`, which carries the scale of the setting), resolves the
+  block, draws it at that scale, waits for the focus the
   clipboard needs (up to 5 s; the menu hands it back after it closes), writes
   the PNG with `navigator.clipboard.write`, and shows a short toast
   (`.mpgh-block-toast`, `role="status"`, or `role="alert"` for a failure).
@@ -559,8 +579,11 @@ Drawing: the subject (the block, or for a section the heading and every
 following sibling up to the next heading of the same or a higher rank) is
 cloned with its computed styles inlined, placed on the background color found
 by walking up from the block, wrapped in an SVG `foreignObject` of the exact
-size plus a 16 px padding, loaded as an image, and drawn on a canvas at 2x
-density (1x when 2x would exceed the canvas limits). The canvas is turned into
+size plus a 16 px padding, loaded as an image, and drawn on a canvas at the
+scale of the `blockImageScale` setting (1 = the actual size of the block, the
+default; 1.5, 2, 2.5, or 3 multiply it). A block too large for the chosen scale
+is drawn at the next smaller scale that fits the canvas limits, and one that
+does not fit at 1 is refused. The canvas is turned into
 the clipboard blob through `toDataURL` and `pngBlobFromDataUrl`, never through
 `toBlob`, which waits for an idle moment of the page and took one to seven
 seconds for any block. The image shows what the
@@ -599,8 +622,8 @@ side, 100 million pixels) or 1500 elements.
 
 The decisions live in the pure `preview/block-image-logic.mts`:
 `blockSelectors`, `headingLevel`, `sectionLength`, `layoutZoom` (the zoom of the
-image document, 1 for an unusable ratio), `planCapture` (density and
-canvas size, `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
+image document, 1 for an unusable ratio), `planCapture` (the requested scale
+or the next smaller one that fits, and the canvas size; `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
 `isTransparentColor`, `pngBlobFromDataUrl`, `pictureHost`, `describeProgress`,
 `progressPercent`, `progressMinMs` and `remainingProgressMs` (the progress bar
 stays visible for at least 500 ms, so a fast fetch does not flash it), and the
@@ -884,6 +907,10 @@ Declared in `package.json` under `configuration`:
   `full` (default `normal`).
 - `markdown-preview-gh.diagnosticLogging` - boolean (default `false`):
   enables the `Markdown Preview GH` output channel for troubleshooting.
+- `markdown-preview-gh.blockImageScale` - number, `1` | `1.5` | `2` | `2.5` |
+  `3` (default `1`, global): the scale of the PNG made by the `Copy This ... As
+PNG` commands, read at every copy. Not watched for a preview refresh: it only
+  matters when a copy runs.
 - `markdown-preview-gh.export.browserPath` - string (default empty, machine
   scope): the Chromium-based browser used by the PDF export. Empty
   means automatic detection; in a remote window the path is on the remote
@@ -1042,21 +1069,29 @@ One test file per module, all run with `npm test`:
   scripts agree; the PDF command is listed in the Command Palette for
   Markdown files on desktop.
 - `test/block-image-protocol.test.mts` - the contract: every kind has a
-  command and a label, capture ids round-trip and reject the built-in image
-  ids and every malformed one, the command argument is validated, and the
-  availability check.
+  command and a label, the allowed scales and the default, capture ids
+  (with their scale) round-trip and reject the built-in image ids, a scale
+  outside the list, and every malformed id, the command argument is
+  validated, and the availability check.
 - `test/block-image-command.test.mts` - the controller with a fake host: the
   key is written only on change and on the first refresh, a failing listing
   counts as unavailable, a copy sends the right id, refuses a context of
   another kind, tells the user when the command has gone and corrects the
-  key, and reports a failing command.
+  key, reports a failing command, sends the scale of the setting, and shows
+  the one-time scale notice only after a copy that worked at the default
+  scale, only for a user who never wrote the setting, never twice, opens the
+  settings only when its action is chosen, and does not show a notice it
+  cannot remember.
 - `test/block-image-logic.test.mts` - the selectors, heading levels, section
-  boundaries, the density and canvas plan at and beyond the limits, empty and
+  boundaries, the scale and canvas plan (every allowed scale, stepping down to
+  a smaller scale, never above the requested one) at and beyond the limits, empty and
   invalid sizes, which overflow values are cut, when a picture is requested
   again with CORS, transparent colors, the picture hosts, the progress text
   and percentage, the minimum display time of the bar, the canvas address to
   blob conversion, and the messages.
-- `test/preview-settings.test.mts` - the injected configuration readers.
+- `test/preview-settings.test.mts` - the injected configuration readers,
+  including the image scale (every allowed value, a fallback to 1 for any
+  other, a number written as text included) and whether a setting was written.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
   `vscode`, only the desktop bundle contains the page server and the headless
@@ -1098,6 +1133,14 @@ One test file per module, all run with `npm test`:
   light in a dark window, and to dark in a light window, the messages take the
   preview's background and `data-theme-mode`. The bar stays visible for at least
   480 ms.
+- `e2e/block-image-scale-setting.spec.ts` - for the default and for each of
+  the five scales, a table is copied and the image is as wide as the block plus
+  its padding times the scale; the specs that measure pixels
+  (`block-image.spec.ts`, `block-image-fidelity.spec.ts`,
+  `block-image-scale.spec.ts`) write `measuredScaleSettings` (scale 2, from
+  `block-image-helpers.mts`) into the settings of their window. A user who never
+  wrote the setting sees the scale notice once after a copy, and not again; a user
+  who wrote it (even the default) never sees it.
 - `e2e/block-image-speed.spec.ts` (fixture `fixtures/block-image-speed.md`) - a
   section with emoji and a list and a plain section are each copied six times;
   every copy, from the request to the message, takes at most 400 ms.
