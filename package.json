@@ -117,7 +117,7 @@
         "markdown-preview-gh.blockImageScale": {
           "type": "number",
           "order": 5,
-          "markdownDescription": "Scale of the PNG images made by the `Copy This ... As PNG` commands: how many image pixels one pixel of the block becomes. `1` is the actual size of the block; larger values give a bigger, sharper image. A block too large for the chosen scale is made at the next smaller scale that fits.",
+          "markdownDescription": "Scale of the PNG images made by the `Copy This ... As PNG` commands: how many image pixels one pixel of the block becomes. `1` is the actual size of the block; larger values give a bigger, sharper image. The scale does not follow VS Code zoom (`window.zoomLevel`) or your display scaling: if you work zoomed in, the image can look smaller than the preview on your screen, so choose a larger scale. A block too large for the chosen scale is made at the next smaller scale that fits.",
           "enum": [
             1,
             1.5,

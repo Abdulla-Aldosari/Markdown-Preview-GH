@@ -60,7 +60,8 @@ export interface BlockImageController {
 export const unavailableMessage = 'Copying as an image is not available in this version of VS Code.';
 
 /** The one-time notice shown after a copy at the default scale, and its action. */
-export const scaleNoticeMessage = 'Block images are copied at their actual size (scale 1). To make them larger, change "Block Image Scale" in the settings.';
+export const scaleNoticeMessage =
+    'Block images are copied at their actual size (scale 1). VS Code zoom and your display scaling do not change it, so the image can look smaller than the preview on your screen. To make it larger, change "Block Image Scale" in the settings.';
 export const scaleNoticeAction = 'Open Settings';
 
 export function createBlockImageController(host: BlockImageHost): BlockImageController {
