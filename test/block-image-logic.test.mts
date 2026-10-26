@@ -21,7 +21,10 @@ import {
     layoutZoom,
     pictureHost,
     planCapture,
+    pngBlobFromDataUrl,
+    progressMinMs,
     progressPercent,
+    remainingProgressMs,
     sectionLength,
 } from '../src/preview/block-image-logic.mts';
 
@@ -200,6 +203,26 @@ test('the progress text and percentage follow the finished fetches', () => {
     assert.equal(progressPercent(0, 4), 0);
     assert.equal(progressPercent(1, 3), 33);
     assert.equal(progressPercent(4, 4), 100);
+});
+
+test('the progress bar stays up until it reached its minimum time', () => {
+    assert.equal(remainingProgressMs(1000, 1100), progressMinMs - 100);
+    assert.equal(remainingProgressMs(1000, 1000), progressMinMs);
+    assert.equal(remainingProgressMs(1000, 1000 + progressMinMs), 0);
+    assert.equal(remainingProgressMs(1000, 9000), 0);
+    assert.equal(remainingProgressMs(1000, 1250.4, 600), 350);
+    assert.equal(remainingProgressMs(Number.NaN, 1000), 0);
+});
+
+test('pngBlobFromDataUrl turns a base64 PNG address into a blob and refuses anything else', async () => {
+    const bytes = [137, 80, 78, 71, 13, 10, 26, 10];
+    const blob = pngBlobFromDataUrl(`data:image/png;base64,${Buffer.from(bytes).toString('base64')}`);
+    assert.ok(blob);
+    assert.equal(blob.type, 'image/png');
+    assert.deepEqual([...new Uint8Array(await blob.arrayBuffer())], bytes);
+    assert.equal(pngBlobFromDataUrl('data:,'), null, 'an empty canvas address');
+    assert.equal(pngBlobFromDataUrl('data:image/jpeg;base64,AAAA'), null, 'another type');
+    assert.equal(pngBlobFromDataUrl('data:image/png;base64,***'), null, 'invalid base64');
 });
 
 test('progressPercent stays within 0 to 100 and survives unusable input', () => {
