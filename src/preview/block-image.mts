@@ -38,7 +38,9 @@ import {
     layoutZoom,
     maxCaptureNodes,
     planCapture,
+    pngBlobFromDataUrl,
     progressPercent,
+    remainingProgressMs,
     sectionLength,
     type FailureReason,
 } from './block-image-logic.mts';
@@ -210,6 +212,8 @@ function picturesOf(element: Element): HTMLImageElement[] {
 
 /** The progress bar of a copy that fetches remote pictures. */
 interface ProgressBar {
+    /** When the bar was shown, in `performance.now()` milliseconds. */
+    shownAt: number;
     update: (done: number) => void;
     remove: () => void;
 }
@@ -358,7 +362,7 @@ async function drawSubject(subject: readonly Element[], progress: ProgressSlot):
     }
     context.scale(planned.plan.scale, planned.plan.scale);
     context.drawImage(image, 0, 0, svgWidth / zoom, svgHeight / zoom);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    const blob = pngBlobFromDataUrl(canvas.toDataURL('image/png'));
     canvas.remove();
     if (!blob) {
         throw new CopyFailure('draw');
@@ -462,7 +466,18 @@ function showProgress(total: number): ProgressBar {
     };
     update(0);
     document.body.append(root);
-    return { update, remove: () => root.remove() };
+    return { shownAt: performance.now(), update, remove: () => root.remove() };
+}
+
+/** Keeps the progress bar of a copy up until it has been visible for its minimum time. */
+async function holdProgress(progress: ProgressSlot): Promise<void> {
+    if (!progress.current) {
+        return;
+    }
+    const wait = remainingProgressMs(progress.current.shownAt, performance.now());
+    if (wait > 0) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, wait));
+    }
 }
 
 let copying = false;
@@ -486,10 +501,12 @@ async function copyBlock(target: CaptureTarget): Promise<void> {
         } catch {
             throw new CopyFailure('clipboard');
         }
+        await holdProgress(progress);
         progress.current?.remove();
         showToast(describeSuccess(label), false);
     } catch (error) {
         const failure = error instanceof CopyFailure ? error : new CopyFailure('draw');
+        await holdProgress(progress);
         progress.current?.remove();
         showToast(describeFailure(label, failure.reason, failure.pictures), true);
     } finally {

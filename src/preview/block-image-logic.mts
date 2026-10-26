@@ -183,6 +183,38 @@ export function describeSuccess(label: string): string {
     return `Copied the ${label} as an image.`;
 }
 
+/**
+ * The PNG a `data:image/png;base64,...` address holds, or `null` when the
+ * address is not a base64 PNG. A canvas that holds a drawn SVG hands its
+ * pixels over at once as an address, while `toBlob` waits for an idle period
+ * of the page that can take seconds.
+ */
+export function pngBlobFromDataUrl(url: string): Blob | null {
+    const prefix = 'data:image/png;base64,';
+    if (!url.startsWith(prefix)) {
+        return null;
+    }
+    try {
+        const binary = atob(url.slice(prefix.length));
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index++) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return new Blob([bytes], { type: 'image/png' });
+    } catch {
+        return null;
+    }
+}
+
+/** How long the progress bar stays visible at least, so a fast fetch does not make it flash. */
+export const progressMinMs = 500;
+
+/** How much longer the progress bar must stay up to reach its minimum, never below 0. */
+export function remainingProgressMs(shownAt: number, now: number, minMs: number = progressMinMs): number {
+    const elapsed = now - shownAt;
+    return Number.isFinite(elapsed) ? Math.max(0, Math.ceil(minMs - elapsed)) : 0;
+}
+
 /** The text of the progress shown while remote pictures are fetched. */
 export function describeProgress(done: number, total: number): string {
     return `Fetching remote pictures: ${done} of ${total}`;
