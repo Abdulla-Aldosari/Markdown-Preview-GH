@@ -1,69 +1,71 @@
 /*
- * The short message the preview shows after "Copy This ... As PNG". It is
- * appended to the body by dist/block-image.js, outside the content the preview
- * rewrites, and takes its colors from the same theme variables as the viewer
- * (the page-level fallbacks keep it readable before a theme applies).
+ * The messages the preview shows for "Copy This ... As PNG": the progress bar
+ * while remote pictures are fetched, the confirmation after a copy, and the
+ * error. They are appended to the body by dist/block-image.js, outside the
+ * content the preview rewrites. Each carries its own data-theme-mode
+ * attribute (the one of the preview wrapper), so the theme variables of the
+ * preview color them: they follow the theme the preview shows, not the theme
+ * of the VS Code window around it.
  */
-.mpgh-block-toast {
-    position: fixed;
-    left: 50%;
-    bottom: 24px;
-    z-index: 1100;
-    max-width: min(90vw, 560px);
-    padding: 8px 16px;
-    transform: translateX(-50%);
-    border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
-    border-radius: 6px;
-    background: var(--vscode-editorWidget-background, #252526);
-    color: var(--vscode-editorWidget-foreground, #cccccc);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-    font-family: var(--vscode-font-family, system-ui, sans-serif);
-    font-size: 13px;
-    line-height: 1.4;
-    pointer-events: none;
-}
-
-.mpgh-block-toast.is-error {
-    border-color: var(--vscode-inputValidation-errorBorder, #be1100);
-    background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
-    color: var(--vscode-inputValidation-errorForeground, #ffffff);
-}
-
-/*
- * The progress bar shown at the bottom of the preview while remote pictures
- * are fetched for the copy. It sits where the message later appears.
- */
+.mpgh-block-toast,
 .mpgh-block-progress {
     position: fixed;
     left: 50%;
     bottom: 24px;
     z-index: 1100;
-    width: min(90vw, 360px);
-    padding: 8px 16px 12px;
     transform: translateX(-50%);
-    border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.4));
+    border: 1px solid var(--borderColor-default, #d1d9e0);
     border-radius: 6px;
-    background: var(--vscode-editorWidget-background, #252526);
-    color: var(--vscode-editorWidget-foreground, #cccccc);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    background: var(--bgColor-default, #fff);
+    color: var(--fgColor-default, #1f2328);
+    box-shadow: 0 4px 16px rgba(1, 4, 9, 0.35);
+    font-family: var(--fontStack-sansSerif, system-ui, sans-serif);
     font-size: 13px;
     line-height: 1.4;
     pointer-events: none;
+}
+
+.mpgh-block-toast {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(90vw, 560px);
+    padding: 8px 16px;
+}
+
+.mpgh-block-toast.is-error {
+    border-color: var(--borderColor-danger-emphasis, #cf222e);
+    background: color-mix(in srgb, var(--fgColor-danger, #d1242f) 14%, var(--bgColor-default, #fff));
+}
+
+/* The check mark that ends a success message. */
+.mpgh-block-toast-icon {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: var(--fgColor-success, #1a7f37);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.mpgh-block-progress {
+    width: min(90vw, 360px);
+    padding: 8px 16px 12px;
 }
 
 .mpgh-block-progress-track {
     height: 4px;
     margin-top: 6px;
     border-radius: 2px;
-    background: var(--vscode-progressBar-background, #0e70c0);
-    background: color-mix(in srgb, var(--vscode-progressBar-background, #0e70c0) 25%, transparent);
+    background: var(--bgColor-neutral-muted, rgba(129, 139, 152, 0.12));
     overflow: hidden;
 }
 
 .mpgh-block-progress-fill {
     width: 0;
     height: 100%;
-    background: var(--vscode-progressBar-background, #0e70c0);
+    background: var(--fgColor-accent, #0969da);
     transition: width 120ms ease-out;
 }

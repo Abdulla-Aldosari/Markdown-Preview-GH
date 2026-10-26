@@ -208,13 +208,25 @@ function picturesOf(element: Element): HTMLImageElement[] {
     return found.filter((item): item is HTMLImageElement => item instanceof HTMLImageElement);
 }
 
+/** The progress bar of a copy that fetches remote pictures. */
+interface ProgressBar {
+    update: (done: number) => void;
+    remove: () => void;
+}
+
+/** Holds the progress bar of one copy, so the copy itself decides when it goes away. */
+interface ProgressSlot {
+    current: ProgressBar | null;
+}
+
 /**
  * Replaces the pictures of the clone by data URIs. A picture whose pixels are
  * locked (it came from another origin) is requested once more with CORS while a
- * progress bar tells the user the copy is working. One picture that cannot be
- * read fails the whole copy: the image is complete or it is not made.
+ * progress bar tells the user the copy is working; the bar stays in `progress`
+ * for the copy to remove. One picture that cannot be read fails the whole copy:
+ * the image is complete or it is not made.
  */
-async function embedPictures(sources: readonly Element[], clones: readonly Element[]): Promise<void> {
+async function embedPictures(sources: readonly Element[], clones: readonly Element[], progress: ProgressSlot): Promise<void> {
     const pairs: Array<[HTMLImageElement, HTMLImageElement]> = [];
     sources.forEach((source, position) => {
         const cloned = picturesOf(clones[position]);
@@ -240,25 +252,22 @@ async function embedPictures(sources: readonly Element[], clones: readonly Eleme
         }
     }
     if (remote.length > 0) {
-        const progress = showProgress(remote.length);
-        try {
-            let done = 0;
-            await Promise.all(
-                remote.map(async ([source, clone]) => {
-                    const address = pictureSource(source);
-                    const url = await readWithCors(address);
-                    if (url) {
-                        clone.setAttribute('src', url);
-                    } else {
-                        unreadable.push(address);
-                    }
-                    done++;
-                    progress.update(done);
-                })
-            );
-        } finally {
-            progress.remove();
-        }
+        const bar = showProgress(remote.length);
+        progress.current = bar;
+        let done = 0;
+        await Promise.all(
+            remote.map(async ([source, clone]) => {
+                const address = pictureSource(source);
+                const url = await readWithCors(address);
+                if (url) {
+                    clone.setAttribute('src', url);
+                } else {
+                    unreadable.push(address);
+                }
+                done++;
+                bar.update(done);
+            })
+        );
     }
     if (unreadable.length > 0) {
         throw new CopyFailure('picture', unreadable);
@@ -309,7 +318,7 @@ function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[]
 }
 
 /** Draws the subject on a canvas and returns it as a PNG. */
-async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
+async function drawSubject(subject: readonly Element[], progress: ProgressSlot): Promise<DrawnBlock> {
     if (hasPendingDiagram(subject)) {
         throw new CopyFailure('rendering');
     }
@@ -328,7 +337,7 @@ async function drawSubject(subject: readonly Element[]): Promise<DrawnBlock> {
     }
     const zoom = layoutZoom(window.devicePixelRatio);
     const { wrapper, clones } = buildCaptureTree(subject, rects, width, height, zoom);
-    await embedPictures(subject, clones);
+    await embedPictures(subject, clones, progress);
     const markup = new XMLSerializer().serializeToString(wrapper);
     // The document is `zoom` times larger than the block; it is drawn back at the block's css size.
     const svgWidth = Math.ceil(width * zoom);
@@ -385,13 +394,39 @@ function waitForFocus(): Promise<boolean> {
     });
 }
 
+/**
+ * The theme mode of the preview wrapper. The messages carry it, so they are
+ * colored by the theme of the preview (its own light or dark setting) and not
+ * by the theme of the VS Code window around it.
+ */
+function readThemeMode(): string {
+    const container = document.querySelector('.mpgh-body');
+    return (container instanceof HTMLElement && container.dataset.themeMode) || 'auto';
+}
+
+/** The check mark that ends the message of a successful copy; it carries no meaning of its own, the text does. */
+function createCheckIcon(): SVGElement {
+    const icon = document.createElementNS(svgNamespace, 'svg');
+    icon.setAttribute('class', `${toastClass}-icon`);
+    icon.setAttribute('viewBox', '0 0 16 16');
+    icon.setAttribute('aria-hidden', 'true');
+    const stroke = document.createElementNS(svgNamespace, 'path');
+    stroke.setAttribute('d', 'M3 8.5 6.5 12 13 4.5');
+    icon.append(stroke);
+    return icon;
+}
+
 /** A short message over the preview, announced to screen readers; it replaces the previous one. */
 function showToast(message: string, failed: boolean): void {
     document.querySelector(`.${toastClass}`)?.remove();
     const toast = document.createElement('div');
     toast.className = `${toastClass}${failed ? ' is-error' : ''}`;
+    toast.dataset.themeMode = readThemeMode();
     toast.setAttribute('role', failed ? 'alert' : 'status');
     toast.textContent = message;
+    if (!failed) {
+        toast.append(createCheckIcon());
+    }
     document.body.append(toast);
     window.setTimeout(() => toast.remove(), failed ? errorToastMs : infoToastMs);
 }
@@ -401,10 +436,11 @@ function showToast(message: string, failed: boolean): void {
  * user can tell the copy is working. It is a progress bar for assistive
  * technology too (`role="progressbar"`), and a new one replaces the old.
  */
-function showProgress(total: number): { update: (done: number) => void; remove: () => void } {
+function showProgress(total: number): ProgressBar {
     document.querySelector(`.${progressClass}`)?.remove();
     const root = document.createElement('div');
     root.className = progressClass;
+    root.dataset.themeMode = readThemeMode();
     root.setAttribute('role', 'progressbar');
     root.setAttribute('aria-valuemin', '0');
     root.setAttribute('aria-valuemax', String(total));
@@ -437,8 +473,11 @@ async function copyBlock(target: CaptureTarget): Promise<void> {
         return;
     }
     copying = true;
+    // The bar of a copy with remote pictures stays until the message takes its
+    // place, so the wait for the drawing and the clipboard is not left silent.
+    const progress: ProgressSlot = { current: null };
     try {
-        const drawn = await drawSubject(resolveSubject(target));
+        const drawn = await drawSubject(resolveSubject(target), progress);
         if (!(await waitForFocus())) {
             throw new CopyFailure('focus');
         }
@@ -447,11 +486,14 @@ async function copyBlock(target: CaptureTarget): Promise<void> {
         } catch {
             throw new CopyFailure('clipboard');
         }
+        progress.current?.remove();
         showToast(describeSuccess(label), false);
     } catch (error) {
         const failure = error instanceof CopyFailure ? error : new CopyFailure('draw');
+        progress.current?.remove();
         showToast(describeFailure(label, failure.reason, failure.pictures), true);
     } finally {
+        progress.current?.remove();
         copying = false;
     }
 }
