@@ -193,9 +193,11 @@ test('the first copy at the default scale tells the user once how to enlarge the
     assert.equal(host.notices.length, 1, 'never again');
 });
 
-test('the notice names the setting and the actual size', () => {
+test('the notice names the setting and the actual size, and says zoom does not change it', () => {
     assert.match(scaleNoticeMessage, /scale 1/);
     assert.match(scaleNoticeMessage, /Block Image Scale/);
+    assert.match(scaleNoticeMessage, /zoom/i);
+    assert.match(scaleNoticeMessage, /display scal/i);
     assert.equal(scaleNoticeAction, 'Open Settings');
 });
 

@@ -74,6 +74,7 @@ test('the scale notice shows once after a copy and never again', async () => {
         await copyThrough(page, frame, 'table >> nth=0', 'Copy This Table As PNG');
         await notice.first().waitFor({ state: 'visible', timeout: 15000 });
         expect(await notice.first().textContent()).toContain('actual size (scale 1)');
+        expect(await notice.first().textContent()).toContain('zoom');
         expect(await notice.first().textContent()).toContain('Open Settings');
         await notice.first().locator('.codicon-notifications-clear, .codicon-close').first().click();
         await notice.first().waitFor({ state: 'hidden', timeout: 10000 });
