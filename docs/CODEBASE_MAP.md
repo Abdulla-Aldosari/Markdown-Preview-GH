@@ -582,8 +582,9 @@ canvas; when the canvas is locked (a picture from another origin) the picture is
 requested once more as an image with `crossOrigin = 'anonymous'`, which only a
 server that allows it answers. While those remote requests run, a progress bar
 (`role="progressbar"`, "Fetching remote pictures: N of M") shows at the bottom
-of the preview and is removed when they end; pictures the page can already read
-never show it. A script never fetches a picture: the preview's security policy
+of the preview; pictures the page can already read never show it. The bar stays
+until the message (success or error) is shown and is removed in the same step,
+so the user never sees the bar vanish and a gap before the message. A script never fetches a picture: the preview's security policy
 forbids it, and every fetch makes the preview show "Some content has been
 disabled in this document". A picture that never loaded is not requested again.
 The copy is complete or it fails: one picture that cannot be read (a remote host
@@ -724,11 +725,15 @@ when printing. The export page never loads it.
 
 The stylesheet of the toast and the progress bar the block-to-image script
 shows: a fixed, centered message at the bottom of the preview after a copy, and
-a bar with a label while remote pictures are fetched. Both are colored with the
-editor widget variables VS Code defines for webviews (with fallbacks); the bar
-fills with the progress-bar color and the error variant of the toast
-(`.is-error`) uses the input-validation colors. Both ignore pointer events. The
-export page never loads it.
+a bar with a label while remote pictures are fetched. Every message carries the
+`data-theme-mode` of the preview wrapper, so it is colored by the preview's
+theme variables (`--bgColor-default`, `--fgColor-default`,
+`--borderColor-default`, `--fgColor-accent` for the bar, `--fgColor-danger` and
+`--borderColor-danger-emphasis` for the error variant `.is-error`), which
+follow the preview's own light or dark setting and not the theme of the VS Code
+window. A success message ends with a green check mark (an SVG, `aria-hidden`,
+stroked with `--fgColor-success`). Both ignore pointer events. The export page
+never loads it.
 
 ### Naming scheme
 
@@ -1079,9 +1084,13 @@ One test file per module, all run with `npm test`:
   only `https:` pictures; the test certificate is in `fixtures/tls/`, and the
   window starts with `--ignore-certificate-errors`) serves a picture that
   answers a CORS request after a delay, with or without
-  `Access-Control-Allow-Origin`: the progress bar shows "0 of 1" and is gone
-  afterwards; with CORS the copy succeeds and reaches the clipboard; without it
-  the copy fails as a whole with the host in the message.
+  `Access-Control-Allow-Origin`: the progress bar shows "0 of 1" and is
+  replaced by the message within one frame (a mutation timeline measures the
+  hand-over); with CORS the copy succeeds, reaches the clipboard, and the message
+  ends with one green check mark; without CORS the copy fails as a whole with
+  the host in the message and no check mark. With the preview theme pinned to
+  light in a dark window, and to dark in a light window, the messages take the
+  preview's background and `data-theme-mode`.
 - `e2e/block-image-scale.spec.ts` (fixture `fixtures/block-image-scale.md`,
   measuring helper `tableLines`) - VS Code runs at a device scale of 1.25
   (`--force-device-scale-factor=1.25`); three tables with two-word cells are
