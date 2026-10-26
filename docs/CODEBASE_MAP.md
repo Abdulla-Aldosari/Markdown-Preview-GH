@@ -560,7 +560,10 @@ following sibling up to the next heading of the same or a higher rank) is
 cloned with its computed styles inlined, placed on the background color found
 by walking up from the block, wrapped in an SVG `foreignObject` of the exact
 size plus a 16 px padding, loaded as an image, and drawn on a canvas at 2x
-density (1x when 2x would exceed the canvas limits). The image shows what the
+density (1x when 2x would exceed the canvas limits). The canvas is turned into
+the clipboard blob through `toDataURL` and `pngBlobFromDataUrl`, never through
+`toBlob`, which waits for an idle moment of the page and took one to seven
+seconds for any block. The image shows what the
 preview shows: every clone is sized as a border box (the measured rectangle is
 the border box, so a `content-box` element such as a code block or a list would
 otherwise add its padding outside the image), and a box that scrolls on the
@@ -598,8 +601,10 @@ The decisions live in the pure `preview/block-image-logic.mts`:
 `blockSelectors`, `headingLevel`, `sectionLength`, `layoutZoom` (the zoom of the
 image document, 1 for an unusable ratio), `planCapture` (density and
 canvas size, `empty` or `tooLarge`), `clipsOverflow`, `canRetryWithCors`,
-`isTransparentColor`, `pictureHost`, `describeProgress`, `progressPercent`, and
-the success and failure messages (the `picture` failure lists the hosts of the
+`isTransparentColor`, `pngBlobFromDataUrl`, `pictureHost`, `describeProgress`,
+`progressPercent`, `progressMinMs` and `remainingProgressMs` (the progress bar
+stays visible for at least 500 ms, so a fast fetch does not flash it), and the
+success and failure messages (the `picture` failure lists the hosts of the
 pictures that could not be fetched).
 
 ### preview/mermaid-theme-logic.mts
@@ -1049,7 +1054,8 @@ One test file per module, all run with `npm test`:
   boundaries, the density and canvas plan at and beyond the limits, empty and
   invalid sizes, which overflow values are cut, when a picture is requested
   again with CORS, transparent colors, the picture hosts, the progress text
-  and percentage, and the messages.
+  and percentage, the minimum display time of the bar, the canvas address to
+  blob conversion, and the messages.
 - `test/preview-settings.test.mts` - the injected configuration readers.
 - `test/bundle.test.mts` - the bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
@@ -1090,7 +1096,11 @@ One test file per module, all run with `npm test`:
   ends with one green check mark; without CORS the copy fails as a whole with
   the host in the message and no check mark. With the preview theme pinned to
   light in a dark window, and to dark in a light window, the messages take the
-  preview's background and `data-theme-mode`.
+  preview's background and `data-theme-mode`. The bar stays visible for at least
+  480 ms.
+- `e2e/block-image-speed.spec.ts` (fixture `fixtures/block-image-speed.md`) - a
+  section with emoji and a list and a plain section are each copied six times;
+  every copy, from the request to the message, takes at most 400 ms.
 - `e2e/block-image-scale.spec.ts` (fixture `fixtures/block-image-scale.md`,
   measuring helper `tableLines`) - VS Code runs at a device scale of 1.25
   (`--force-device-scale-factor=1.25`); three tables with two-word cells are
