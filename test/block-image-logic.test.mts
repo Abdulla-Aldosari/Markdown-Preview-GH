@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { blockKinds } from '../src/block-image-protocol.mts';
+import { blockImageScales, blockKinds } from '../src/block-image-protocol.mts';
 import {
     blockSelectors,
     canRetryWithCors,
@@ -79,40 +79,61 @@ test('layoutZoom falls back to 1 for a ratio that cannot be used', () => {
     }
 });
 
-test('planCapture takes the sharpest density that fits', () => {
-    const result = planCapture(800, 600);
-    assert.equal(result.ok, true);
+test('planCapture makes the canvas at the requested scale when it fits', () => {
+    const result = planCapture(800, 600, 2);
     assert.ok(result.ok);
     assert.deepEqual(result.plan, { scale: 2, canvasWidth: 1600, canvasHeight: 1200 });
+    const actual = planCapture(800, 600, 1);
+    assert.ok(actual.ok);
+    assert.deepEqual(actual.plan, { scale: 1, canvasWidth: 800, canvasHeight: 600 });
+});
+
+test('planCapture honors every allowed scale, fractional ones included', () => {
+    for (const scale of blockImageScales) {
+        const result = planCapture(400, 200, scale);
+        assert.ok(result.ok, String(scale));
+        assert.equal(result.plan.scale, scale);
+        assert.equal(result.plan.canvasWidth, Math.ceil(400 * scale));
+        assert.equal(result.plan.canvasHeight, Math.ceil(200 * scale));
+    }
 });
 
 test('planCapture rounds a fractional canvas up so the block is never cut', () => {
-    const result = planCapture(100.2, 50.4);
+    const result = planCapture(100.2, 50.4, 2);
     assert.ok(result.ok);
     assert.deepEqual(result.plan, { scale: 2, canvasWidth: 201, canvasHeight: 101 });
 });
 
-test('planCapture falls back to the normal density when double does not fit', () => {
+test('planCapture steps down to the next smaller scale that fits', () => {
     const height = canvasLimits.maxSide - 100;
-    const result = planCapture(400, height);
+    const result = planCapture(400, height, 2);
     assert.ok(result.ok);
     assert.equal(result.plan.scale, 1);
     assert.equal(result.plan.canvasHeight, height);
+    const stepped = planCapture(100, Math.floor(canvasLimits.maxSide / 2), 3);
+    assert.ok(stepped.ok);
+    assert.equal(stepped.plan.scale, 2, 'a block that does not fit at 3, 2.5 fits at 2 only');
 });
 
-test('planCapture keeps double density at the exact side limit and refuses one pixel more at normal density', () => {
-    const atLimit = planCapture(100, canvasLimits.maxSide / 2);
+test('planCapture never goes above the requested scale', () => {
+    const result = planCapture(100, 100, 1.5);
+    assert.ok(result.ok);
+    assert.equal(result.plan.scale, 1.5);
+});
+
+test('planCapture keeps the requested scale at the exact side limit and refuses one pixel more at scale 1', () => {
+    const atLimit = planCapture(100, canvasLimits.maxSide / 2, 2);
     assert.ok(atLimit.ok);
     assert.equal(atLimit.plan.scale, 2);
-    assert.deepEqual(planCapture(100, canvasLimits.maxSide + 1), { ok: false, reason: 'tooLarge' });
+    assert.deepEqual(planCapture(100, canvasLimits.maxSide + 1, 2), { ok: false, reason: 'tooLarge' });
 });
 
 test('planCapture also limits the area of the canvas', () => {
     const limits = { maxSide: 20000, maxArea: 1_000_000 };
-    const fitsAtNormal = planCapture(900, 1000, limits);
+    const fitsAtNormal = planCapture(900, 1000, 2, limits);
     assert.ok(fitsAtNormal.ok);
     assert.equal(fitsAtNormal.plan.scale, 1);
-    assert.deepEqual(planCapture(1100, 1000, limits), { ok: false, reason: 'tooLarge' });
+    assert.deepEqual(planCapture(1100, 1000, 2, limits), { ok: false, reason: 'tooLarge' });
 });
 
 test('planCapture rejects empty and invalid sizes', () => {
@@ -123,10 +144,9 @@ test('planCapture rejects empty and invalid sizes', () => {
         [Number.NaN, 10],
         [10, Number.POSITIVE_INFINITY],
     ]) {
-        assert.deepEqual(planCapture(width, height), { ok: false, reason: 'empty' }, `${width}x${height}`);
+        assert.deepEqual(planCapture(width, height, 2), { ok: false, reason: 'empty' }, `${width}x${height}`);
     }
 });
-
 test('clipsOverflow is true for every scrolling overflow value on either axis', () => {
     for (const [x, y] of [
         ['auto', 'auto'],
