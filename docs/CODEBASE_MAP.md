@@ -202,8 +202,10 @@ after re-checking availability.
 
 After a copy that worked at the default scale (1), the controller shows a
 one-time information notice ("Block images are copied at their actual size
-(scale 1). To make them larger, change \"Block Image Scale\" in the settings.",
-with an `Open Settings` action that opens the setting). The notice is only for a
+(scale 1). VS Code zoom and your display scaling do not change it, so the
+image can look smaller than the preview on your screen. To make it larger,
+change \"Block Image Scale\" in the settings.", with an `Open Settings` action
+that opens the setting). The notice is only for a
 user who never wrote the setting (`isSettingExplicit`: user, workspace, or
 folder value, even one equal to the default, counts as written), it is
 remembered in `globalState` (`markdown-preview-gh.blockImageScaleNoticeShown`)
@@ -581,7 +583,9 @@ cloned with its computed styles inlined, placed on the background color found
 by walking up from the block, wrapped in an SVG `foreignObject` of the exact
 size plus a 16 px padding, loaded as an image, and drawn on a canvas at the
 scale of the `blockImageScale` setting (1 = the actual size of the block, the
-default; 1.5, 2, 2.5, or 3 multiply it). A block too large for the chosen scale
+default; 1.5, 2, 2.5, or 3 multiply it). The scale multiplies css pixels, so it
+does not follow VS Code zoom or the display scale: the image keeps the same
+size while the block grows or shrinks on the screen. A block too large for the chosen scale
 is drawn at the next smaller scale that fits the canvas limits, and one that
 does not fit at 1 is refused. The canvas is turned into
 the clipboard blob through `toDataURL` and `pngBlobFromDataUrl`, never through
@@ -1079,7 +1083,8 @@ One test file per module, all run with `npm test`:
   another kind, tells the user when the command has gone and corrects the
   key, reports a failing command, sends the scale of the setting, and shows
   the one-time scale notice only after a copy that worked at the default
-  scale, only for a user who never wrote the setting, never twice, opens the
+  scale (and says that zoom and display scaling do not change it), only for a
+  user who never wrote the setting, never twice, opens the
   settings only when its action is chosen, and does not show a notice it
   cannot remember.
 - `test/block-image-logic.test.mts` - the selectors, heading levels, section
