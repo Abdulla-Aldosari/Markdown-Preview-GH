@@ -141,12 +141,13 @@ Command Palette entries are listed under the **Markdown Preview GH** category.
 
 These settings define the global defaults. Per-file preferences (see [Per-file preferences](#per-file-preferences)) always take priority for the files they are set on.
 
-| Setting                                 | Default  | Description                                                                             |
-| --------------------------------------- | -------- | --------------------------------------------------------------------------------------- |
-| `markdown-preview-gh.colorTheme`        | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.         |
-| `markdown-preview-gh.contentDirection`  | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                 |
-| `markdown-preview-gh.contentWidth`      | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px). |
-| `markdown-preview-gh.diagnosticLogging` | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.               |
+| Setting                                 | Default  | Description                                                                                      |
+| --------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| `markdown-preview-gh.colorTheme`        | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.                  |
+| `markdown-preview-gh.contentDirection`  | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                          |
+| `markdown-preview-gh.contentWidth`      | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px).          |
+| `markdown-preview-gh.diagnosticLogging` | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.                        |
+| `markdown-preview-gh.blockImageScale`   | `1`      | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`. |
 
 ## Changelog
 
