@@ -71,6 +71,7 @@ interface CopyReport {
     progress: string | null;
     progressGone: boolean;
     progressRemovedAt: number | null;
+    progressAddedAt: number | null;
     toastAddedAt: number | null;
     toastMode: string | null;
     toastBackground: string;
@@ -86,10 +87,17 @@ interface CopyReport {
 async function startTimeline(frame: Frame): Promise<void> {
     await frame.evaluate(() => {
         const marks = window as unknown as {
-            __timeline?: { progressRemovedAt: number | null; toastAddedAt: number | null; progressSeen: string | null; progressBackground: string | null };
+            __timeline?: {
+                progressRemovedAt: number | null;
+                progressAddedAt: number | null;
+                toastAddedAt: number | null;
+                progressSeen: string | null;
+                progressBackground: string | null;
+            };
         };
         const timeline = {
             progressRemovedAt: null as number | null,
+            progressAddedAt: null as number | null,
             toastAddedAt: null as number | null,
             progressSeen: null as string | null,
             progressBackground: null as string | null,
@@ -104,6 +112,7 @@ async function startTimeline(frame: Frame): Promise<void> {
                     }
                     if (node.classList.contains('mpgh-block-progress')) {
                         timeline.progressSeen = node.textContent;
+                        timeline.progressAddedAt = now;
                         timeline.progressBackground = getComputedStyle(node).backgroundColor;
                     }
                     if (node.classList.contains('mpgh-block-toast') && timeline.toastAddedAt === null) {
@@ -140,7 +149,13 @@ async function runCopy(allowCors: boolean, previewTheme: 'light' | 'dark', windo
         const seen = await frame.evaluate(() => {
             const timeline = (
                 window as unknown as {
-                    __timeline: { progressRemovedAt: number | null; toastAddedAt: number | null; progressSeen: string | null; progressBackground: string | null };
+                    __timeline: {
+                        progressRemovedAt: number | null;
+                        progressAddedAt: number | null;
+                        toastAddedAt: number | null;
+                        progressSeen: string | null;
+                        progressBackground: string | null;
+                    };
                 }
             ).__timeline;
             const element = document.querySelector<HTMLElement>('.mpgh-block-toast');
@@ -163,6 +178,7 @@ async function runCopy(allowCors: boolean, previewTheme: 'light' | 'dark', windo
             progress: seen.progressSeen,
             progressGone: seen.progressGone,
             progressRemovedAt: seen.progressRemovedAt,
+            progressAddedAt: seen.progressAddedAt,
             toastAddedAt: seen.toastAddedAt,
             toastMode: seen.toastMode,
             toastBackground: seen.toastBackground,
@@ -181,6 +197,9 @@ async function runCopy(allowCors: boolean, previewTheme: 'light' | 'dark', windo
 
 /** The longest time the page may show neither the bar nor the message between them: less than one frame. */
 const handoverMs = 16;
+
+/** The least time the bar is visible: the minimum of the page, less a frame of measuring slack. */
+const progressVisibleMs = 480;
 
 /** `#rrggbb` or `#rgb` as the `rgb(r, g, b)` text a computed color has. */
 function asRgb(hex: string): string {
@@ -203,6 +222,7 @@ test('a remote picture that allows CORS shows a progress bar until the success m
     expect(result.progressRemovedAt, 'the bar was removed').not.toBeNull();
     expect(result.toastAddedAt, 'the message was added').not.toBeNull();
     expect(Math.abs((result.toastAddedAt ?? 0) - (result.progressRemovedAt ?? 0)), 'the message takes the place of the bar at once').toBeLessThanOrEqual(handoverMs);
+    expect((result.progressRemovedAt ?? 0) - (result.progressAddedAt ?? 0), 'the bar stays up for its minimum time').toBeGreaterThanOrEqual(progressVisibleMs);
     expect(result.toast).toBe('Copied the section as an image.');
     expect(result.iconCount, 'one check mark').toBe(1);
     expect(result.iconAfterText, 'the check mark ends the message').toBe(true);
@@ -215,6 +235,7 @@ test('a remote picture that does not allow CORS fails the whole copy, with no ch
     expect(result.progress, 'the progress bar must appear while the picture is fetched').toBe('Fetching remote pictures: 0 of 1');
     expect(result.progressGone, 'the progress bar must be gone when the message shows').toBe(true);
     expect(Math.abs((result.toastAddedAt ?? 0) - (result.progressRemovedAt ?? 0)), 'the message takes the place of the bar at once').toBeLessThanOrEqual(handoverMs);
+    expect((result.progressRemovedAt ?? 0) - (result.progressAddedAt ?? 0), 'the bar stays up for its minimum time').toBeGreaterThanOrEqual(progressVisibleMs);
     expect(result.toast).toMatch(/^Could not copy the section as an image: 1 remote picture could not be fetched \(127\.0\.0\.1:\d+\)\.$/);
     expect(result.iconCount, 'an error carries no check mark').toBe(0);
     expect(result.png, 'a failed copy leaves the clipboard untouched').toBeNull();
