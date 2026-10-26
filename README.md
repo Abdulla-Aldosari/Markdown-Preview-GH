@@ -71,6 +71,19 @@ Content direction, content width, and theme can be set for a single file without
 
 These choices are remembered for the file in the current workspace, and they never affect other files.
 
+### Copy a block as an image
+
+Right-click a table, a code block, a diagram, or a heading in the preview and choose **Copy This Table As PNG**, **Copy This Code Block As PNG**, **Copy This Diagram As PNG**, or **Copy This Section As PNG**. The block is copied to the clipboard as a PNG image, ready to paste into a chat, a document, or an issue. A heading copies its whole section, up to the next heading of the same or a higher level.
+
+- **Remote pictures** inside the block show a progress bar while they are fetched. If one cannot be fetched, the copy fails with a message that names the host, and nothing is copied: you get a complete image or none. A picture whose server does not allow it (a missing `Access-Control-Allow-Origin` header) fails this way, even though the preview shows it.
+- **Image size.** The `markdown-preview-gh.blockImageScale` setting (`1`, `1.5`, `2`, `2.5`, or `3`, default `1`) sets how many image pixels one pixel of the block becomes. `1` is the actual size of the block.
+
+#### The image can look smaller than the preview
+
+The scale does **not** follow VS Code zoom or your operating system's display scaling. If you work with VS Code zoomed in (`window.zoomLevel` above 0), or on a screen scaled to 125% or more, the preview looks larger to you than the pixel size the image is made at, so the pasted image looks smaller than what you saw. For example, at `window.zoomLevel` 1 (a factor of 1.2) a block shown 181 pixels wide on screen is copied 151 pixels wide at scale `1`; a display scaled to 200% doubles what you see.
+
+To get an image that matches what you see, raise `markdown-preview-gh.blockImageScale` to roughly that factor: `1.5` for a zoom of 1.2 or a display scaled to 125% or 150%, `2` for 200%, and so on. The first time you copy a block with the default scale, a message says this once and offers a button that opens the setting.
+
 ### Open in Browser and Print
 
 - **Open in Browser** - turns the rendered document into a standalone HTML page and opens it in your default browser.
@@ -134,6 +147,7 @@ Right-click inside the preview for the per-file preferences, export, and GitHub 
 | Export As... > HTML Light Theme | Preview context menu, Command Palette |
 | Export As... > HTML Dark Theme  | Preview context menu, Command Palette |
 | Open File on GitHub             | Preview context menu                  |
+| Copy This ... As PNG            | Preview context menu                  |
 
 Command Palette entries are listed under the **Markdown Preview GH** category.
 
