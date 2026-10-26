@@ -114,6 +114,26 @@
           "description": "Enables diagnostic logging to the 'Markdown Preview GH' output channel. Useful when troubleshooting the extension.",
           "default": false
         },
+        "markdown-preview-gh.blockImageScale": {
+          "type": "number",
+          "order": 5,
+          "markdownDescription": "Scale of the PNG images made by the `Copy This ... As PNG` commands: how many image pixels one pixel of the block becomes. `1` is the actual size of the block; larger values give a bigger, sharper image. A block too large for the chosen scale is made at the next smaller scale that fits.",
+          "enum": [
+            1,
+            1.5,
+            2,
+            2.5,
+            3
+          ],
+          "enumDescriptions": [
+            "1x - the actual size (default)",
+            "1.5x",
+            "2x - twice the size, sharper on high-density screens",
+            "2.5x",
+            "3x"
+          ],
+          "default": 1
+        },
         "markdown-preview-gh.export.browserPath": {
           "type": "string",
           "order": 4,
