@@ -13,8 +13,14 @@
 
 import type { ElectronApplication, Frame, Page } from 'playwright';
 
-/** The space the copy keeps around a block, in the pixels of the image: 16 CSS pixels at double density. */
-export const imagePadding = 32;
+/** The scale the specs that measure pixels ask for in the settings of their window. */
+export const measuredScale = 2;
+
+/** The settings that make the copied image `measuredScale` times the block. */
+export const measuredScaleSettings = { 'markdown-preview-gh.blockImageScale': measuredScale };
+
+/** The space the copy keeps around a block, in the pixels of the image: 16 CSS pixels at `measuredScale`. */
+export const imagePadding = 16 * measuredScale;
 
 /** How many times a menu entry is clicked before the test gives up. */
 const menuClickAttempts = 3;

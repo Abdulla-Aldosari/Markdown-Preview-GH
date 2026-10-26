@@ -8,13 +8,24 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { blockCases, copyThrough, pageToken, pngEntriesAt, readClipboardImage, readClipboardPng, waitForTaggedPreview, type ClipboardImage } from './block-image-helpers.mts';
+import {
+    blockCases,
+    copyThrough,
+    measuredScale,
+    measuredScaleSettings,
+    pageToken,
+    pngEntriesAt,
+    readClipboardImage,
+    readClipboardPng,
+    waitForTaggedPreview,
+    type ClipboardImage,
+} from './block-image-helpers.mts';
 import { launchVscode, openMarkdownPreview } from './helpers.mts';
 
 test.setTimeout(300000);
 
 test('each block offers its own entry and copies a real image without rebuilding the preview', async () => {
-    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md', { settings: measuredScaleSettings });
     try {
         const frame = await openMarkdownPreview(page);
         await waitForTaggedPreview(frame);
@@ -49,7 +60,7 @@ test('each block offers its own entry and copies a real image without rebuilding
 });
 
 test('a right click and a copy never open the zoom viewer, and a viewer that is open is closed first', async () => {
-    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md', { settings: measuredScaleSettings });
     try {
         const frame = await openMarkdownPreview(page);
         await waitForTaggedPreview(frame);
@@ -77,7 +88,7 @@ test('a right click and a copy never open the zoom viewer, and a viewer that is 
 });
 
 test('a block far below the visible part copies without moving the preview', async () => {
-    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md', { settings: measuredScaleSettings });
     try {
         const frame = await openMarkdownPreview(page);
         await waitForTaggedPreview(frame);
@@ -97,7 +108,7 @@ test('a block far below the visible part copies without moving the preview', asy
 });
 
 test('a picture inside a section is part of the copied image', async () => {
-    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md');
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image.md', { settings: measuredScaleSettings });
     try {
         const frame = await openMarkdownPreview(page);
         await waitForTaggedPreview(frame);
@@ -120,9 +131,9 @@ test('a picture inside a section is part of the copied image', async () => {
             fs.writeFileSync(path.join(process.cwd(), 'test-results', 'block-image-picture-section.png'), png);
         }
         const image = await readClipboardImage(app);
-        // The image is drawn at twice the density and holds the heading, the whole picture, and the padding.
+        // The image is drawn at the scale of the setting and holds the heading, the whole picture, and the padding.
         expect(shown.pictureHeight, 'the picture must be displayed at a measurable size').toBeGreaterThan(100);
-        expect(image.height, 'the section holds the heading and the whole picture').toBeGreaterThanOrEqual(Math.floor((shown.headingHeight + shown.pictureHeight) * 2));
+        expect(image.height, 'the section holds the heading and the whole picture').toBeGreaterThanOrEqual(Math.floor((shown.headingHeight + shown.pictureHeight) * measuredScale));
         expect(image.inkShare, 'the picture fills a large part of the image').toBeGreaterThan(0.3);
     } finally {
         await app.close();

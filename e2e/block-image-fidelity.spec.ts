@@ -8,7 +8,7 @@
 import { chromium, expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
-import { analyzePng, copyThrough, imagePadding, readClipboardPng } from './block-image-helpers.mts';
+import { analyzePng, copyThrough, imagePadding, measuredScale, readClipboardPng } from './block-image-helpers.mts';
 import { launchVscode, openMarkdownPreview } from './helpers.mts';
 
 test.setTimeout(300000);
@@ -32,7 +32,9 @@ for (const direction of ['ltr', 'rtl'] as const) {
     test(`a copied block fills its own box, shows no scrollbar, and keeps the picture warning away (${direction})`, async () => {
         const browser = await chromium.launch();
         const helper = await browser.newPage();
-        const { app, page } = await launchVscode('Default Dark Modern', 'block-image-fidelity.md', { settings: { 'markdown-preview-gh.contentDirection': direction } });
+        const { app, page } = await launchVscode('Default Dark Modern', 'block-image-fidelity.md', {
+            settings: { 'markdown-preview-gh.contentDirection': direction, 'markdown-preview-gh.blockImageScale': measuredScale },
+        });
         try {
             const frame = await openMarkdownPreview(page);
             await frame.waitForFunction(() => document.querySelector('table')?.hasAttribute('data-vscode-context') && document.querySelectorAll('.mpgh-mermaid svg').length >= 2);

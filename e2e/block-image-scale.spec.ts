@@ -6,7 +6,7 @@
  *-------------------------------------------------*/
 
 import { chromium, expect, test } from '@playwright/test';
-import { copyThrough, readClipboardPng, tableLines } from './block-image-helpers.mts';
+import { copyThrough, measuredScaleSettings, readClipboardPng, tableLines } from './block-image-helpers.mts';
 import { launchVscode, openMarkdownPreview } from './helpers.mts';
 
 test.setTimeout(180000);
@@ -29,7 +29,7 @@ const near = (image: number[], page: number[]): boolean => image.length === page
 test('a table copied at a 125% display scale keeps the rows and columns of the page', async () => {
     const browser = await chromium.launch();
     const helper = await browser.newPage();
-    const { app, page } = await launchVscode('Default Dark Modern', 'block-image-scale.md', { extraArgs: ['--force-device-scale-factor=1.25'] });
+    const { app, page } = await launchVscode('Default Dark Modern', 'block-image-scale.md', { extraArgs: ['--force-device-scale-factor=1.25'], settings: measuredScaleSettings });
     try {
         expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1.25);
         const frame = await openMarkdownPreview(page);
