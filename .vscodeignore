@@ -9,7 +9,7 @@ node_modules/
 test/
 src/
 build/
-docs/*.md
+docs/
 images/readme/
 e2e/
 playwright.config.ts
@@ -21,3 +21,4 @@ commitlint.config.js
 cliff.toml
 tsconfig.json
 **/*.map
+CONTRIBUTING.md

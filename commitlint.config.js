@@ -89,6 +89,7 @@ const baseScopes = [
     // docs/ and assets
     ['docs', 'project documentation under docs/', ['docs/']],
     ['readme', 'changes to the text/content of README.md itself', ['README.md']],
+    ['contributing', 'the contributor guide: setup, commands, code rules, and commit rules', ['CONTRIBUTING.md']],
     ['assets', 'adding or replacing image files used by the extension or its documentation', ['images/']],
     ['license', 'changes to the LICENSE file', ['LICENSE']],
     ['changelog', 'CHANGELOG.md content', ['CHANGELOG.md']],

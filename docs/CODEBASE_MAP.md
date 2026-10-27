@@ -54,7 +54,12 @@ stored in the workspace state takes priority over the global mode; a per-file
   Playwright's Electron launcher against a real VS Code window
   (`npm run test:e2e`); `playwright.config.ts` configures them.
 - `tsconfig.json` - type checking only (`noEmit`).
-- `docs/` - `CODEBASE_MAP.md` and local developer notes.
+- `docs/` - `CODEBASE_MAP.md` and `guide/`, the user guides that the README
+  links to (preferences, copy as an image, the image viewer, export and
+  print, export without the save dialog, and troubleshooting). None of it is
+  packed into the extension (`.vscodeignore` excludes `docs/`).
+- `CONTRIBUTING.md` - how to set up, build, test, and commit; it points here
+  for the code structure.
 - `images/` - marketplace and README assets.
 - `.husky/` - git hooks: `pre-commit` (lint-staged, typecheck, tests) and
   `commit-msg` (commitlint). Installed by the `prepare` script.
