@@ -62,20 +62,61 @@ Fenced `mermaid` code blocks render as diagrams, ZenUML included. Diagrams follo
 
 Content direction, content width, and theme can be set for a single file without touching your global settings. Right-click inside the preview to reach them:
 
-![Preview context menu](images/readme/context-menu.png)
+<p align="center">
+  <img src="images/readme/context-menu.png" alt="Preview context menu" />
+</p>
 
-- **Content Direction...** - choose `LTR`, `RTL`, or `Auto`.
-- **Content Width...** - choose `Narrow` (640px), `Normal` (838px, GitHub's own width), `Wide` (1024px), or `Full` (1200px).
-- **Theme...** - choose `Light` or `Dark`.
+- **Preferences** - a submenu that lists every option in three groups, with a check mark (✔) beside the option in effect for this file:
+    - **Width** - `Narrow` (640px), `Normal` (838px, GitHub's own width), `Wide` (1024px), or `Full` (1200px).
+    - **Direction** - `Auto` (detected from the content), `LTR`, or `RTL`.
+    - **Theme** - `Auto` (follow the editor's light or dark theme, even when your global theme setting is pinned), `Dark`, or `Light`.
 - **Reset Preferences for this file** - clear this file's overrides and return to your global settings.
 
-These choices are remembered for the file in the current workspace, and they never affect other files.
+<p align="center">
+  <img src="images/readme/context-menu-preferences-submenu.png" alt="Preview context menu" />
+</p>
 
-### Copy a block as an image
+<!--Auto-Stripping-By-DevDeck-During-The-Publishing-Process-For-Marketplace--[!NOTE]-not-supported-->
 
-Right-click a table, a code block, a diagram, or a heading in the preview and choose **Copy This Table As PNG**, **Copy This Code Block As PNG**, **Copy This Diagram As PNG**, or **Copy This Section As PNG**. The block is copied to the clipboard as a PNG image, ready to paste into a chat, a document, or an issue. A heading copies its whole section, up to the next heading of the same or a higher level.
+> [!NOTE]
+> These choices are remembered for the file in the current workspace, and they never affect other files.
 
-- **Remote pictures** inside the block show a progress bar while they are fetched. If one cannot be fetched, the copy fails with a message that names the host, and nothing is copied: you get a complete image or none. A picture whose server does not allow it (a missing `Access-Control-Allow-Origin` header) fails this way, even though the preview shows it.
+### Copy as an image
+
+Right-click inside the preview and copy part of the document to the clipboard as a PNG image, ready to paste into a chat, a document, or an issue. Four commands are available:
+
+- **Copy This Section As PNG** - right-click a heading to copy its whole section.
+- **Copy This Table As PNG** - right-click a table to copy it.
+- **Copy This Code Block As PNG** - right-click a code block to copy it.
+- **Copy This Diagram As PNG** - right-click a diagram to copy it.
+
+### Copy This Section As PNG
+
+Right-click a heading and choose **Copy This Section As PNG**. The section is copied up to the next heading of the same or a higher level, so its subsections are included, and a message confirms that it was copied. Then paste it where you need it, for example into a new GitHub issue (the **Preview** tab shows the pasted image) or into a Discord message.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Abdulla-Aldosari/repo-assets/main/Markdown-Preview-GH/readme/copy-this-section-as-png.gif" alt="Copy This Section As PNG, pasted into a GitHub issue and a Discord direct message" />
+</p>
+
+### Copy This Table, Code Block, or Diagram As PNG
+
+The same right-click works on the other blocks of the preview:
+
+- **Copy This Table As PNG** - on a table.
+- **Copy This Code Block As PNG** - on a code block.
+- **Copy This Diagram As PNG** - on a Mermaid diagram.
+
+Each block is copied on its own and pasted as a separate image, for example into a Figma file.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Abdulla-Aldosari/repo-assets/main/Markdown-Preview-GH/readme/copy-this-as-png.gif" alt="Copy This Table, Code Block, and Diagram As PNG, pasted into Figma" />
+</p>
+
+### Image copy details
+
+These points apply to all four commands.
+
+- **Remote pictures** inside the copied part show a progress bar while they are fetched. If one cannot be fetched, the copy fails with a message that names the host, and nothing is copied: you get a complete image or none. A picture whose server does not allow it (a missing `Access-Control-Allow-Origin` header) fails this way, even though the preview shows it.
 - **Image size.** The `markdown-preview-gh.blockImageScale` setting (`1`, `1.5`, `2`, `2.5`, or `3`, default `1`) sets how many image pixels one pixel of the block becomes. `1` is the actual size of the block.
 
 #### The image can look smaller than the preview
@@ -93,6 +134,8 @@ A progress notification shows while the page is prepared, and a second click on 
 
 Both are available from the preview context menu and from the Command Palette while a Markdown file is active. The page follows the theme of your preview, and printing always produces light output. Relative images are resolved against the Markdown file's folder, and the generated page is kept in the extension's storage folder, so nothing is added to your project.
 
+<!--Auto-Stripping-By-DevDeck-During-The-Publishing-Process-For-Marketplace--[!NOTE]-not-supported-->
+
 > [!NOTE]
 > Mermaid diagrams are drawn inside the exported page itself, so the page is fully self-contained and works offline.
 
@@ -100,10 +143,15 @@ Both are available from the preview context menu and from the Command Palette wh
 
 ### Export As...
 
-Right-click inside the preview and choose **Export As...** to save the document as a standalone HTML file:
+Right-click inside the preview and choose **Export As...** to save the document as a standalone HTML file or as a PDF:
 
 - **HTML Light Theme** - saves the page with the light theme.
 - **HTML Dark Theme** - saves the page with the dark theme.
+- **PDF** - saves the document as a PDF file. It is available in desktop VS Code only, and it needs a Chromium-based browser (see [Export As PDF](#export-as-pdf)).
+
+<p align="center">
+  <img src="images/readme/context-menu-export-as-submenu.png" alt="Preview context menu" />
+</p>
 
 A save dialog asks where to put the file and suggests the Markdown file's name with an `.html` extension. Both commands are also in the Command Palette while a Markdown file is active, and they work in VS Code for the Web. When the file is written, a message shows where it was saved, with an **Open File** button that opens it in your browser (in a remote window the message has no button, because the file is on the remote machine).
 
@@ -113,7 +161,63 @@ The exported file is yours to move or share, so it carries only what it can hold
 - **Internet images stay links.** They load only while you are online.
 - **Links are left exactly as you wrote them.** A relative link such as `other.md` cannot know where you will keep the file, so it is not rewritten. The one exception is a link that starts with `//`, which becomes `https://`.
 
-To export without the save dialog, for example from a keybinding or a task, pass the destination in the command argument: `{ "target": "D:/out/page.html" }`. Add `"resource"` with the Markdown file's URI to export a file other than the active one.
+To skip the save dialog, see [Export without the save dialog](#export-without-the-save-dialog).
+
+#### Export As PDF
+
+**PDF** prints the document with a Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) that is already installed on your computer. The extension starts the browser in the background, prints the page, and closes it, so nothing is downloaded and no browser window opens.
+
+- **The page is always light**, like `Print...`, so a dark preview still gives a PDF with dark text on a white page.
+- **Local images are embedded, internet images stay links, and links are left as you wrote them**, the same as the HTML export. Mermaid diagrams are drawn before the page is printed.
+- **A progress notification shows while the file is made**, and you can cancel it. A cancelled export writes nothing. When the file is written, a message shows where it was saved.
+- **The browser is detected automatically.** To use a specific one, set `markdown-preview-gh.export.browserPath` (see [Settings](#settings)).
+- **It is not available in VS Code for the Web**, because a web page cannot start a browser on your computer. Use the HTML export there.
+- **In a remote window (WSL, SSH, Dev Containers)** the browser is looked up on the remote machine, not on your local computer.
+
+If no browser is found, a message explains where the search ran and offers buttons: **Open Settings**, **Export as HTML instead**, and **Open in Browser (then Save as PDF)**.
+
+#### Export without the save dialog
+
+Every export asks where to save the file. To skip the dialog, bind a key to an export command and pass the destination in `args`:
+
+1. Open the Command Palette and run **Preferences: Open Keyboard Shortcuts (JSON)**.
+2. Add an entry like this one:
+
+```json
+[
+    {
+        "key": "ctrl+alt+e",
+        "command": "markdown-preview-gh.exportHtmlLight",
+        "when": "editorLangId == markdown",
+        "args": { "target": "D:/out/page.html" }
+    }
+]
+```
+
+Pressing `Ctrl+Alt+E` while a Markdown file is active now writes `D:/out/page.html` at once, with no dialog. An existing file at that path is replaced without asking.
+
+- `target` - where to write the file: a file path such as `D:/out/page.html`, or a URI such as `file:///D:/out/page.html`. Use forward slashes in a path.
+- `resource` - optional. The Markdown file to export, as a URI. Without it, the export uses the Markdown file that is active in the editor.
+
+To export one fixed file whichever file is open, add `resource`:
+
+```json
+{
+    "key": "ctrl+alt+p",
+    "command": "markdown-preview-gh.exportPdf",
+    "args": {
+        "resource": "file:///D:/docs/guide.md",
+        "target": "D:/out/guide.pdf"
+    }
+}
+```
+
+The export commands are `markdown-preview-gh.exportHtmlLight`, `markdown-preview-gh.exportHtmlDark`, and `markdown-preview-gh.exportPdf`.
+
+<!--Auto-Stripping-By-DevDeck-During-The-Publishing-Process-For-Marketplace--[!NOTE]-not-supported-->
+
+> [!NOTE]
+> The `args` form works from a keybinding. VS Code tasks (`tasks.json`) and the `code` command line cannot run an extension command, so they cannot pass these arguments.
 
 ### Open File on GitHub
 
@@ -125,7 +229,7 @@ VS Code 1.106.0 or later.
 
 ## Installation
 
-- **From the Marketplace:** install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Abdulla-Aldosari.markdown-preview-gh), or open the Extensions view in VS Code, search for **Markdown Preview GH**, and select **Install**.
+- **From the Marketplace:** install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Abdulla-Aldosari.markdown-preview-gh), or open the Extensions view in VS Code, search for `Markdown Preview GH`, and select **Install**.
 - **From a VSIX file:** run `code --install-extension markdown-preview-gh-<version>.vsix`, or choose **Install from VSIX...** from the Extensions view menu.
 
 ## Usage
@@ -138,16 +242,18 @@ Right-click inside the preview for the per-file preferences, export, and GitHub 
 
 | Command                         | Where to find it                      |
 | ------------------------------- | ------------------------------------- |
-| Content Direction...            | Preview context menu                  |
-| Content Width...                | Preview context menu                  |
-| Theme...                        | Preview context menu                  |
+| Preferences                     | Preview context menu                  |
 | Reset Preferences for this file | Preview context menu                  |
 | Open in Browser                 | Preview context menu, Command Palette |
 | Print...                        | Preview context menu, Command Palette |
 | Export As... > HTML Light Theme | Preview context menu, Command Palette |
 | Export As... > HTML Dark Theme  | Preview context menu, Command Palette |
+| Export As... > PDF              | Preview context menu, Command Palette |
 | Open File on GitHub             | Preview context menu                  |
-| Copy This ... As PNG            | Preview context menu                  |
+| Copy This Section As PNG        | Preview context menu                  |
+| Copy This Table As PNG          | Preview context menu                  |
+| Copy This Code Block As PNG     | Preview context menu                  |
+| Copy This Diagram As PNG        | Preview context menu                  |
 
 Command Palette entries are listed under the **Markdown Preview GH** category.
 
@@ -155,13 +261,14 @@ Command Palette entries are listed under the **Markdown Preview GH** category.
 
 These settings define the global defaults. Per-file preferences (see [Per-file preferences](#per-file-preferences)) always take priority for the files they are set on.
 
-| Setting                                 | Default  | Description                                                                                      |
-| --------------------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| `markdown-preview-gh.colorTheme`        | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.                  |
-| `markdown-preview-gh.contentDirection`  | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                          |
-| `markdown-preview-gh.contentWidth`      | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px).          |
-| `markdown-preview-gh.diagnosticLogging` | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.                        |
-| `markdown-preview-gh.blockImageScale`   | `1`      | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`. |
+| Setting                                  | Default  | Description                                                                                              |
+| ---------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
+| `markdown-preview-gh.colorTheme`         | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.                          |
+| `markdown-preview-gh.contentDirection`   | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                                  |
+| `markdown-preview-gh.contentWidth`       | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px).                  |
+| `markdown-preview-gh.diagnosticLogging`  | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.                                |
+| `markdown-preview-gh.blockImageScale`    | `1`      | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`.         |
+| `markdown-preview-gh.export.browserPath` | empty    | Full path of the Chromium-based browser used by **Export As... > PDF**. Empty detects one automatically. |
 
 ## Changelog
 
