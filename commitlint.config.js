@@ -59,7 +59,7 @@ const baseScopes = [
     [
         'imageViewer',
         'the zoomable viewer of images and Mermaid diagrams in the preview: the click-to-open layer, zoom and pan geometry, eligibility rules, and its stylesheet',
-        ['src/preview/image-viewer.mts', 'src/preview/viewer-geometry.mts', 'src/preview/viewer-eligibility.mts', 'src/styles/image-viewer.css'],
+        ['src/preview/image-viewer.mts', 'src/preview/viewer-geometry.mts', 'src/preview/viewer-eligibility.mts', 'src/styles/image-viewer.css', 'docs/guide/image-viewer.md'],
     ],
 
     [

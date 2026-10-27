@@ -2,6 +2,8 @@
 
 Click an image or a Mermaid diagram in the preview to open it in a viewer that zooms and pans. The viewer grows out of the clicked element and shrinks back into it when you close it.
 
+![Print example](https://raw.githubusercontent.com/Abdulla-Aldosari/repo-assets/main/Markdown-Preview-GH/readme/image-viewer-example.gif)
+
 ## Controls
 
 | Action                               | How                                                                       |
