@@ -8,8 +8,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolveColorMode, validColorModes } from '../src/color-mode.mts';
 
-test('validColorModes lists only the two per-file modes', () => {
-    assert.deepEqual(validColorModes, ['light', 'dark']);
+test('validColorModes lists the three per-file modes', () => {
+    assert.deepEqual(validColorModes, ['auto', 'light', 'dark']);
+});
+
+test('a per-file auto override beats a pinned global mode', () => {
+    assert.equal(resolveColorMode('dark', 'auto'), 'auto');
+    assert.equal(resolveColorMode('light', 'auto'), 'auto');
 });
 
 test('resolveColorMode prefers a valid per-file override', () => {

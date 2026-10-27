@@ -31,8 +31,9 @@ The preview supports exactly two GitHub themes (`light`, `dark`) and one
 setting, `markdown-preview-gh.colorTheme`, with the modes `auto` (match the
 editor's light/dark color theme), `dark`, and `light`. The active theme is
 implied by the mode, so the render wrapper carries a single
-`data-theme-mode` attribute. A per-file override (`Light` / `Dark`) stored
-in the workspace state takes priority over the global mode.
+`data-theme-mode` attribute. A per-file override (`Auto` / `Dark` / `Light`)
+stored in the workspace state takes priority over the global mode; a per-file
+`Auto` follows the editor's theme even when the global mode is pinned.
 
 ## Directory layout
 
@@ -72,7 +73,7 @@ The plugin in `src/markdown-plugin.mts` overrides `markdownIt.renderer.render` a
 wraps the rendered HTML:
 
 ```html
-<div class="mpgh-body" dir="ltr|rtl|auto" data-vscode-context='{"resource":"<uri>"}' data-theme-mode="auto|dark|light">
+<div class="mpgh-body" dir="ltr|rtl|auto" data-vscode-context='{"resource":"<uri>","mpghWidth":"...","mpghDirection":"...","mpghTheme":"..."}' data-theme-mode="auto|dark|light">
     <div class="mpgh-content" data-content-width="narrow|normal|wide|full">...rendered Markdown...</div>
 </div>
 ```
@@ -81,7 +82,10 @@ wraps the rendered HTML:
   themselves to.
 - `data-theme-mode` selects the active theme; `.mpgh-content` and
   `data-content-width` drive the layout overrides in `overrides.css`.
-- `data-vscode-context` carries the document URI for the webview scripts.
+- `data-vscode-context` carries the document URI for the webview scripts and
+  the effective width, direction, and theme of the document (`mpghWidth`,
+  `mpghDirection`, `mpghTheme`), which the `when` clauses of the `Preferences`
+  submenu read to show the check mark of the option in effect.
 
 ### Theme activation selectors
 
@@ -121,8 +125,10 @@ The shared extension code. It is the only module with logic that imports
 - `extension-web.mts` - bundled for the browser into `dist/extension-web.js`
   (`browser` in `package.json`). It never imports a Node built-in.
 
-- `activate` registers the commands (the four block-image commands through
-  `registerBlockImageCommands`), subscribes a configuration listener
+- `activate` registers the commands (one pair per option of the `Preferences`
+  submenu from `preferences-menu.mts`, sharing `setPreferenceCommand`; the
+  four block-image commands through `registerBlockImageCommands`), subscribes
+  a configuration listener
   that refreshes the preview when one of the watched setting keys
   (`colorTheme`, `contentDirection`, `contentWidth`) changes, and returns
   `{ extendMarkdownIt }`, which installs the plugin from
@@ -237,7 +243,10 @@ URI. It installs:
 - a `renderAttrs` override that drops block-level `dir` attributes, and
   `fence`/`code_block` renderer rules that force code blocks to LTR,
 - the render override that adds the `mpgh-body` wrapper described above and
-  tracks the current document's direction for the alert renderer.
+  tracks the current document's direction for the alert renderer. The
+  wrapper's `data-vscode-context` also carries `mpghWidth`, `mpghDirection`,
+  and `mpghTheme` (the effective values), which the `Preferences` submenu
+  reads to mark the option in effect.
 
 ### preview-settings.mts
 
@@ -256,8 +265,22 @@ configuration object is injected through its `get(key)` method
 ### color-mode.mts
 
 Pure mode resolution for the wrapper attribute: `resolveColorMode(
-globalMode, fileMode)` returns a valid per-file mode (`light`/`dark`) when
-present, otherwise the global mode unchanged. Exports `validColorModes`.
+globalMode, fileMode)` returns a valid per-file mode (`auto`/`light`/`dark`)
+when present, otherwise the global mode unchanged; a per-file `auto` follows
+the editor's theme whatever the global mode is. Exports `validColorModes`.
+
+### preferences-menu.mts
+
+The pure model of the `Preferences` submenu of the preview context menu: one
+table of ten options in three groups (`Width`, `Direction`, `Theme`) with the
+preference each stores, its labels, its two command ids, its `when` clauses,
+and its menu group. Exports `preferenceOptions`, `preferencesSubmenuId`,
+`preferencesSubmenuLabel`, `checkMark`, and `buildPreferenceContext`, which
+turns the effective options of a document into the context values
+`mpghWidth`, `mpghDirection`, and `mpghTheme`. Every option has a plain
+command and a checked command (title ending with the check mark) that run the
+same handler: a menu entry cannot show a check mark itself, so exactly one of
+the two is visible, chosen by the context value of the preview page.
 
 ### emoji-map.mts
 
@@ -922,14 +945,19 @@ PNG` commands, read at every copy. Not watched for a preview refresh: it only
 
 Per-file overrides (`contentDirection`, `contentWidth`, `colorMode`) live in
 `ctx.workspaceState` under the `filePreferences` key, keyed by document URI,
-and are managed by the context menu commands.
+and are written by the `Preferences` submenu commands and cleared by
+`resetPreferences`.
 
 ## Commands and menus
 
 The commands (`commands` and `webview/context` in `package.json`):
 
-- `setContentDirection`, `setContentWidth`, `setColorMode`,
-  `resetPreferences` - per-file overrides via Quick Picks.
+- The `Preferences` submenu of the preview context menu holds one command per
+  option (`markdown-preview-gh.preferences.<group>.<value>`, plus a
+  `.checked` twin shown while the option is in effect), grouped as width,
+  direction, and theme; each stores a per-file override and refreshes the
+  preview. `resetPreferences` clears the overrides of the file. The option
+  commands are hidden from the Command Palette.
 - `openInBrowser`, `print` - standalone export to the browser.
 - `openFileOnGitHub` - opens the current file on github.com.
 - `copyTableAsPng`, `copyCodeBlockAsPng`, `copyDiagramAsPng`,
@@ -971,7 +999,11 @@ the pure `src/github-url.mts` module.
 
 One test file per module, all run with `npm test`:
 
-- `test/color-mode.test.mts` - per-file mode resolution.
+- `test/color-mode.test.mts` - per-file mode resolution, including a per-file
+  `auto` that beats a pinned global mode.
+- `test/preferences-menu.test.mts` - the option table: every setting value is
+  an option, the group order and labels, the plain and checked commands with
+  opposite conditions, and the context values.
 - `test/export-html.test.mts` - `forceTheme`, `prepareMermaidHtml`,
   `buildStandaloneHtml`, `buildRendererPageHtml`, `parseRendererMessage`,
   `exportFileName`, `toLocalFileUri`, HTML escaping.
@@ -1064,10 +1096,14 @@ One test file per module, all run with `npm test`:
 - `test/viewer-eligibility.test.mts` - which clicks open the viewer, and
   vector source detection.
 - `test/webview-context-menu.test.mts` - the `webview/context` entries of
-  `package.json`: every command outside the `Export As...` submenu is
-  listed, every entry (commands and the submenu) is hidden while the viewer
-  layer is under the pointer, the submenu holds the three formats in order
-  with PDF desktop only, no whole-document PNG export is declared, each block
+  `package.json`: every command outside the two submenus is
+  listed, every entry (commands and the submenus) is hidden while the viewer
+  layer is under the pointer, the `Export As...` submenu holds the three
+  formats in order with PDF desktop only, the `Preferences` submenu matches
+  the option table (a plain and a checked command per option, never shown
+  together, hidden from the Command Palette, and no command of the earlier
+  separate width, direction, or theme entries remains), no whole-document PNG
+  export is declared, each block
   command is titled for its block with the exact `when` clause and no Command
   Palette entry, and the manifest, the protocol module, and the preview
   scripts agree; the PDF command is listed in the Command Palette for
@@ -1177,6 +1213,13 @@ One test file per module, all run with `npm test`:
   pinned theme, embedded local images (including `srcset`), the remote image
   kept as a link, the missing image keeping its written path, and links left
   as written when the file is saved at a different folder depth.
+- `e2e/preferences-menu.spec.ts` (fixture `fixtures/preferences-menu.md`) - a
+  real VS Code window: the context menu offers `Preferences`, whose submenu
+  lists the ten options in three groups split by separators with the mark on
+  `Width Normal`, `Direction LTR`, and `Theme Auto`; choosing `Width Wide`,
+  `Direction RTL`, and `Theme Dark` moves each mark to the chosen option.
+  The preview is rebuilt after every choice, so the spec looks the preview
+  frame up again each time.
 - `e2e/mermaid-themes.spec.ts` - UI tests (`npm run test:e2e`) that launch
   a real VS Code window with the extension, open the built-in preview of a
   fixture covering every diagram type, and pin the computed colors of the

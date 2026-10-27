@@ -145,23 +145,108 @@
     },
     "commands": [
       {
-        "command": "markdown-preview-gh.setContentDirection",
-        "title": "Content Direction...",
-        "category": "Markdown Preview GH"
+        "command": "markdown-preview-gh.preferences.width.narrow",
+        "title": "Width Narrow",
+        "category": "Markdown Preview GH: Preferences"
       },
       {
-        "command": "markdown-preview-gh.setContentWidth",
-        "title": "Content Width...",
-        "category": "Markdown Preview GH"
+        "command": "markdown-preview-gh.preferences.width.narrow.checked",
+        "title": "Width Narrow ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.normal",
+        "title": "Width Normal",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.normal.checked",
+        "title": "Width Normal ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.wide",
+        "title": "Width Wide",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.wide.checked",
+        "title": "Width Wide ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.full",
+        "title": "Width Full",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.width.full.checked",
+        "title": "Width Full ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.auto",
+        "title": "Direction Auto",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.auto.checked",
+        "title": "Direction Auto ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.ltr",
+        "title": "Direction LTR",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.ltr.checked",
+        "title": "Direction LTR ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.rtl",
+        "title": "Direction RTL",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.direction.rtl.checked",
+        "title": "Direction RTL ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.auto",
+        "title": "Theme Auto",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.auto.checked",
+        "title": "Theme Auto ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.dark",
+        "title": "Theme Dark",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.dark.checked",
+        "title": "Theme Dark ✔",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.light",
+        "title": "Theme Light",
+        "category": "Markdown Preview GH: Preferences"
+      },
+      {
+        "command": "markdown-preview-gh.preferences.theme.light.checked",
+        "title": "Theme Light ✔",
+        "category": "Markdown Preview GH: Preferences"
       },
       {
         "command": "markdown-preview-gh.resetPreferences",
         "title": "Reset Preferences for this file",
-        "category": "Markdown Preview GH"
-      },
-      {
-        "command": "markdown-preview-gh.setColorMode",
-        "title": "Theme...",
         "category": "Markdown Preview GH"
       },
       {
@@ -219,6 +304,10 @@
       {
         "id": "markdown-preview-gh.exportAs",
         "label": "Export As..."
+      },
+      {
+        "id": "markdown-preview-gh.preferences",
+        "label": "Preferences"
       }
     ],
     "menus": {
@@ -239,19 +328,87 @@
       ],
       "commandPalette": [
         {
-          "command": "markdown-preview-gh.setContentDirection",
+          "command": "markdown-preview-gh.preferences.width.narrow",
           "when": "false"
         },
         {
-          "command": "markdown-preview-gh.setContentWidth",
+          "command": "markdown-preview-gh.preferences.width.narrow.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.normal",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.normal.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.wide",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.wide.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.full",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.full.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.auto",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.auto.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.ltr",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.ltr.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.rtl",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.rtl.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.auto",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.auto.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.dark",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.dark.checked",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.light",
+          "when": "false"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.light.checked",
           "when": "false"
         },
         {
           "command": "markdown-preview-gh.resetPreferences",
-          "when": "false"
-        },
-        {
-          "command": "markdown-preview-gh.setColorMode",
           "when": "false"
         },
         {
@@ -328,29 +485,121 @@
           "group": "z_gmpExport@3"
         },
         {
-          "command": "markdown-preview-gh.setContentWidth",
+          "submenu": "markdown-preview-gh.preferences",
           "when": "webviewId == 'markdown.preview' && !mpghViewer",
           "group": "z_gmpPrefs@1"
         },
         {
-          "command": "markdown-preview-gh.setContentDirection",
-          "when": "webviewId == 'markdown.preview' && !mpghViewer",
-          "group": "z_gmpPrefs@2"
-        },
-        {
-          "command": "markdown-preview-gh.setColorMode",
-          "when": "webviewId == 'markdown.preview' && !mpghViewer",
-          "group": "z_gmpPrefs@3"
-        },
-        {
           "command": "markdown-preview-gh.resetPreferences",
           "when": "webviewId == 'markdown.preview' && !mpghViewer",
-          "group": "z_gmpPrefs@4"
+          "group": "z_gmpPrefs@2"
         },
         {
           "command": "markdown-preview-gh.openFileOnGitHub",
           "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb && markdownPreviewGh.isGitHubRepo",
           "group": "z_gmpSource@1"
+        }
+      ],
+      "markdown-preview-gh.preferences": [
+        {
+          "command": "markdown-preview-gh.preferences.width.narrow",
+          "when": "mpghWidth != 'narrow'",
+          "group": "1_width@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.narrow.checked",
+          "when": "mpghWidth == 'narrow'",
+          "group": "1_width@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.normal",
+          "when": "mpghWidth != 'normal'",
+          "group": "1_width@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.normal.checked",
+          "when": "mpghWidth == 'normal'",
+          "group": "1_width@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.wide",
+          "when": "mpghWidth != 'wide'",
+          "group": "1_width@3"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.wide.checked",
+          "when": "mpghWidth == 'wide'",
+          "group": "1_width@3"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.full",
+          "when": "mpghWidth != 'full'",
+          "group": "1_width@4"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.width.full.checked",
+          "when": "mpghWidth == 'full'",
+          "group": "1_width@4"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.auto",
+          "when": "mpghDirection != 'auto'",
+          "group": "2_direction@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.auto.checked",
+          "when": "mpghDirection == 'auto'",
+          "group": "2_direction@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.ltr",
+          "when": "mpghDirection != 'ltr'",
+          "group": "2_direction@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.ltr.checked",
+          "when": "mpghDirection == 'ltr'",
+          "group": "2_direction@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.rtl",
+          "when": "mpghDirection != 'rtl'",
+          "group": "2_direction@3"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.direction.rtl.checked",
+          "when": "mpghDirection == 'rtl'",
+          "group": "2_direction@3"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.auto",
+          "when": "mpghTheme != 'auto'",
+          "group": "3_theme@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.auto.checked",
+          "when": "mpghTheme == 'auto'",
+          "group": "3_theme@1"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.dark",
+          "when": "mpghTheme != 'dark'",
+          "group": "3_theme@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.dark.checked",
+          "when": "mpghTheme == 'dark'",
+          "group": "3_theme@2"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.light",
+          "when": "mpghTheme != 'light'",
+          "group": "3_theme@3"
+        },
+        {
+          "command": "markdown-preview-gh.preferences.theme.light.checked",
+          "when": "mpghTheme == 'light'",
+          "group": "3_theme@3"
         }
       ]
     }

@@ -8,11 +8,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { preferenceOptions, preferencesSubmenuId, preferencesSubmenuLabel } from '../src/preferences-menu.mts';
 
 interface MenuEntry {
     command?: string;
     submenu?: string;
     when?: string;
+    group?: string;
 }
 
 const manifest = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
@@ -21,8 +23,10 @@ const manifest = JSON.parse(fs.readFileSync(new URL('../package.json', import.me
 const entries = manifest.contributes.menus['webview/context'];
 const exportEntries = manifest.contributes.menus['markdown-preview-gh.exportAs'];
 
-test('the preview context menu lists every command outside the Export As submenu', () => {
-    const inSubmenu = new Set(exportEntries.map((item) => item.command));
+const preferencesEntries = manifest.contributes.menus[preferencesSubmenuId];
+
+test('the preview context menu lists every command outside the two submenus', () => {
+    const inSubmenu = new Set([...exportEntries, ...preferencesEntries].map((item) => item.command));
     const commands = manifest.contributes.commands
         .map((item) => item.command)
         .filter((command) => !inSubmenu.has(command))
@@ -55,6 +59,38 @@ test('the Export As submenu lists the three formats in order, PDF desktop only',
     );
     const byCommand = new Map(exportEntries.map((item) => [item.command, item.when]));
     assert.equal(byCommand.get('markdown-preview-gh.exportPdf'), '!isWeb', 'PDF needs a desktop browser');
+});
+
+test('the Preferences submenu is declared once, hangs off the preview context menu, and sits before Reset', () => {
+    const submenus = manifest.contributes.submenus.filter((item) => item.id === preferencesSubmenuId);
+    assert.deepEqual(submenus, [{ id: preferencesSubmenuId, label: preferencesSubmenuLabel }]);
+    const hanging = entries.filter((item) => item.submenu === preferencesSubmenuId);
+    assert.equal(hanging.length, 1);
+    assert.equal(hanging[0].group, 'z_gmpPrefs@1');
+    assert.equal(entries.find((item) => item.command === 'markdown-preview-gh.resetPreferences')?.group, 'z_gmpPrefs@2');
+});
+
+test('the Preferences submenu lists every option twice, a plain and a checked command that never show together', () => {
+    assert.equal(preferencesEntries.length, preferenceOptions.length * 2);
+    for (const option of preferenceOptions) {
+        const plain = preferencesEntries.find((item) => item.command === option.command);
+        const checked = preferencesEntries.find((item) => item.command === option.checkedCommand);
+        assert.deepEqual(plain, { command: option.command, when: option.whenUnchecked, group: option.menuGroup });
+        assert.deepEqual(checked, { command: option.checkedCommand, when: option.whenChecked, group: option.menuGroup });
+        const titles = manifest.contributes.commands.filter((item) => item.command === option.command || item.command === option.checkedCommand).map((item) => item.title);
+        assert.deepEqual(titles, [option.label, option.checkedLabel]);
+    }
+});
+
+test('the option commands are hidden from the Command Palette and the old quick pick commands are gone', () => {
+    const palette = manifest.contributes.menus['commandPalette'];
+    for (const option of preferenceOptions) {
+        for (const command of [option.command, option.checkedCommand]) {
+            assert.equal(palette.find((item) => item.command === command)?.when, 'false', `${command} needs a clicked preview`);
+        }
+    }
+    const declared = JSON.stringify(manifest.contributes);
+    assert.doesNotMatch(declared, /setContentWidth|setContentDirection|setColorMode/);
 });
 
 test('no whole-document PNG export is declared anywhere in the manifest', () => {

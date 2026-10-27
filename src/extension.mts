@@ -13,7 +13,8 @@
 
 import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
-import { resolveColorMode, validColorModes } from './color-mode.mts';
+import { resolveColorMode } from './color-mode.mts';
+import { preferenceOptions, type PreferenceKey, type PreferenceOption } from './preferences-menu.mts';
 import { buildStandaloneHtml, exportFileName, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
 import { resolveDocumentUrls } from './url-resolution.mts';
 import { isUriString, prepareExportBody } from './export-body.mts';
@@ -28,20 +29,9 @@ import { describeMachine } from './headless/machine-label.mts';
 import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
 import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
-import {
-    BLOCK_IMAGE_SCALE_KEY,
-    CONFIG_SECTION,
-    CONTENT_DIRECTIONS,
-    CONTENT_WIDTHS,
-    isSettingExplicit,
-    readImageSettings,
-    readLayoutSettings,
-    readThemeSettings,
-} from './preview-settings.mts';
+import { BLOCK_IMAGE_SCALE_KEY, CONFIG_SECTION, isSettingExplicit, readImageSettings, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
 
 type CommandArgs = { resource?: string } | undefined;
-
-type PreferenceKey = 'contentDirection' | 'contentWidth' | 'colorMode';
 
 type FilePreferences = Partial<Record<PreferenceKey, string>>;
 
@@ -53,24 +43,6 @@ let extensionContext: vscode.ExtensionContext | undefined;
 
 /** Node-only services injected by the desktop entry point; `undefined` in the web bundle. */
 let desktopServices: DesktopServices | undefined;
-
-const directionLabels: Record<string, string> = {
-    ltr: 'LTR (Left to Right)',
-    rtl: 'RTL (Right to Left)',
-    auto: 'Auto (Detect from content)',
-};
-
-const widthLabels: Record<string, string> = {
-    narrow: 'Narrow (640px)',
-    normal: 'Normal (838px) - GitHub width',
-    wide: 'Wide (1024px)',
-    full: 'Full (1200px)',
-};
-
-const colorModeLabels: Record<string, string> = {
-    light: 'Light',
-    dark: 'Dark',
-};
 
 function readConfiguration(): vscode.WorkspaceConfiguration {
     return vscode.workspace.getConfiguration(CONFIG_SECTION, null);
@@ -171,7 +143,7 @@ function resetFilePreferences(resource: string): void {
 }
 
 /**
- * Activates the extension: registers the seven commands, subscribes a
+ * Activates the extension: registers the commands, subscribes a
  * configuration listener that refreshes the preview when the watched
  * settings change, and returns the Markdown-it extension hook.
  * @param context The extension context of the active session.
@@ -194,11 +166,13 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(refreshPreviewOnSettingChange));
 
+    for (const option of preferenceOptions) {
+        const handler = (args: CommandArgs): Promise<void> => setPreferenceCommand(option, args);
+        context.subscriptions.push(vscode.commands.registerCommand(option.command, handler), vscode.commands.registerCommand(option.checkedCommand, handler));
+    }
+
     context.subscriptions.push(
-        vscode.commands.registerCommand('markdown-preview-gh.setContentDirection', setContentDirectionCommand),
-        vscode.commands.registerCommand('markdown-preview-gh.setContentWidth', setContentWidthCommand),
         vscode.commands.registerCommand('markdown-preview-gh.resetPreferences', resetPreferencesCommand),
-        vscode.commands.registerCommand('markdown-preview-gh.setColorMode', setColorModeCommand),
         vscode.commands.registerCommand('markdown-preview-gh.openInBrowser', (args: unknown) => exportDocumentCommand(args, false)),
         vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true)),
         vscode.commands.registerCommand('markdown-preview-gh.exportHtmlLight', (args: unknown) => exportHtmlCommand(args, 'light')),
@@ -273,71 +247,18 @@ function registerBlockImageCommands(context: vscode.ExtensionContext): void {
 }
 
 /**
- * Shows a quick pick for the content direction and stores the picked value
- * as a per-file preference, then refreshes the preview.
+ * Stores the option chosen in the `Preferences` submenu as a per-file
+ * preference of the document the menu was opened for, then refreshes the
+ * preview.
+ * @param option The option the command stands for.
  * @param args The command arguments carrying the document URI.
  */
-async function setContentDirectionCommand(args: CommandArgs): Promise<void> {
+async function setPreferenceCommand(option: PreferenceOption, args: CommandArgs): Promise<void> {
     const resource = args && args.resource ? String(args.resource) : undefined;
-    const current = getContentDirection(resource);
-    const picked = await vscode.window.showQuickPick(
-        CONTENT_DIRECTIONS.map((value) => ({
-            label: directionLabels[value],
-            value,
-            description: value === current ? 'Current' : undefined,
-        })),
-        { placeHolder: 'Content direction for this file' }
-    );
-    if (!picked || !resource) {
+    if (!resource) {
         return;
     }
-    setFilePreference(resource, 'contentDirection', picked.value);
-    await vscode.commands.executeCommand('markdown.preview.refresh');
-}
-
-/**
- * Shows a quick pick for the color mode and stores the picked value as a
- * per-file preference, then refreshes the preview.
- * @param args The command arguments carrying the document URI.
- */
-async function setColorModeCommand(args: CommandArgs): Promise<void> {
-    const resource = args && args.resource ? String(args.resource) : undefined;
-    const current = getColorMode(resource);
-    const picked = await vscode.window.showQuickPick(
-        validColorModes.map((value) => ({
-            label: colorModeLabels[value],
-            value,
-            description: value === current ? 'Current' : undefined,
-        })),
-        { placeHolder: 'Theme for this file' }
-    );
-    if (!picked || !resource) {
-        return;
-    }
-    setFilePreference(resource, 'colorMode', picked.value);
-    await vscode.commands.executeCommand('markdown.preview.refresh');
-}
-
-/**
- * Shows a quick pick for the content width and stores the picked value as a
- * per-file preference, then refreshes the preview.
- * @param args The command arguments carrying the document URI.
- */
-async function setContentWidthCommand(args: CommandArgs): Promise<void> {
-    const resource = args && args.resource ? String(args.resource) : undefined;
-    const current = getContentWidth(resource);
-    const picked = await vscode.window.showQuickPick(
-        CONTENT_WIDTHS.map((value) => ({
-            label: widthLabels[value],
-            value,
-            description: value === current ? 'Current' : undefined,
-        })),
-        { placeHolder: 'Content width for this file' }
-    );
-    if (!picked || !resource) {
-        return;
-    }
-    setFilePreference(resource, 'contentWidth', picked.value);
+    setFilePreference(resource, option.key, option.value);
     await vscode.commands.executeCommand('markdown.preview.refresh');
 }
 

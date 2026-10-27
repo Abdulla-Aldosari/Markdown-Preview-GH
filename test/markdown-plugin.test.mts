@@ -107,7 +107,20 @@ test('the render wrapper asks the provider about the current document', () => {
     const { md, requested } = createRenderer();
     const html = md.render('x\n', { currentDocument: { toString: () => 'file:///c%3A/a.md' } });
     assert.deepEqual(requested, ['file:///c%3A/a.md']);
-    assert.match(html, /data-vscode-context='\{&quot;resource&quot;:&quot;file:\/\/\/c%3A\/a\.md&quot;\}'/);
+    assert.match(html, /data-vscode-context='\{&quot;resource&quot;:&quot;file:\/\/\/c%3A\/a\.md&quot;,/);
+});
+
+test('the render wrapper carries the effective preferences as context values', () => {
+    const { md } = createRenderer({ direction: 'rtl', width: 'wide', themeMode: 'dark' });
+    const html = md.render('x\n', { currentDocument: { toString: () => 'file:///c%3A/a.md' } });
+    const attribute = /data-vscode-context='([^']*)'/.exec(html)?.[1] ?? '';
+    const context = JSON.parse(attribute.replaceAll('&quot;', '"')) as Record<string, string>;
+    assert.deepEqual(context, {
+        resource: 'file:///c%3A/a.md',
+        mpghWidth: 'wide',
+        mpghDirection: 'rtl',
+        mpghTheme: 'dark',
+    });
 });
 
 test('the render wrapper uses an empty resource when no document is given', () => {

@@ -14,6 +14,7 @@
 
 import type MarkdownIt from 'markdown-it';
 import { emojiMap } from './emoji-map.mts';
+import { buildPreferenceContext } from './preferences-menu.mts';
 
 /** The attributes the render wrapper materializes for one document. */
 export interface RenderOptions {
@@ -262,7 +263,7 @@ function installGfmExtensions(markdownIt: MarkdownIt, getRenderOptions: RenderOp
         const resource = doc ? doc.toString() : '';
         const { direction, width, themeMode } = getRenderOptions(resource);
         currentRenderDirection = direction;
-        const context = markdownIt.utils.escapeHtml(JSON.stringify({ resource }));
+        const context = markdownIt.utils.escapeHtml(JSON.stringify({ resource, ...buildPreferenceContext({ direction, width, themeMode }) }));
         const html = reclassifyMermaidPlaceholders(render.apply(markdownIt.renderer, args));
         return `<div class="mpgh-body" dir="${direction}" data-vscode-context='${context}' data-theme-mode="${themeMode}">
                     <div class="mpgh-content" data-content-width="${width}">${html}</div>

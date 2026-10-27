@@ -1,5 +1,6 @@
 node_modules
 .vscode/settings.json
+.vscode/runbox.*
 .devdeck/
 .cline/
 .mindstream/

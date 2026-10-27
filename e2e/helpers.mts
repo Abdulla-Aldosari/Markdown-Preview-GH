@@ -179,7 +179,7 @@ export async function openMarkdownPreview(page: Page): Promise<Frame> {
     return frame;
 }
 
-async function findPreviewFrame(page: Page): Promise<Frame> {
+export async function findPreviewFrame(page: Page): Promise<Frame> {
     // The preview webview's outer frame loads a loader page; the rendered
     // document lives in its nested fake.html frame, which shares the loader's
     // origin but not its query parameters.

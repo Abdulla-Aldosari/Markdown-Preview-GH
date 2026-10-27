@@ -10,13 +10,15 @@
  * depend on the `vscode` API so it stays unit-testable in plain Node.
  */
 
-export type FileColorMode = 'light' | 'dark';
+export type FileColorMode = 'auto' | 'light' | 'dark';
 
-export const validColorModes: readonly FileColorMode[] = ['light', 'dark'];
+export const validColorModes: readonly FileColorMode[] = ['auto', 'light', 'dark'];
 
 /**
  * Resolves the effective color mode for a document. A valid per-file override
- * ('light' or 'dark') wins; otherwise the global mode is returned unchanged.
+ * ('auto', 'light', or 'dark') wins, so 'auto' pins a file to the editor's
+ * theme whatever the global mode is; otherwise the global mode is returned
+ * unchanged.
  */
 export function resolveColorMode(globalMode: string, fileMode: string | null | undefined): string {
     const validFileMode = validColorModes.find((mode) => mode === fileMode);

@@ -27,6 +27,7 @@ const baseScopes = [
     ['markdownPlugin', 'the Markdown-it plugin: alerts, task lists, emoji, code direction, and the render wrapper', ['src/markdown-plugin.mts']],
     ['previewSettings', 'configuration reading: theme modes and layout settings', ['src/preview-settings.mts']],
     ['colorMode', 'resolving the active light/dark color mode', ['src/color-mode.mts']],
+    ['preferencesMenu', 'the Preferences submenu of the preview context menu: option table, check marks, and context values', ['src/preferences-menu.mts']],
     ['emojiMap', 'GitHub emoji shortcode table', ['src/emoji-map.mts']],
     ['exportHtml', 'standalone HTML export and browser/print commands, including the guard against repeated invocations', ['src/export-html.mts', 'src/busy-guard.mts']],
     ['urlResolution', 'resolving relative links in the exported page to absolute URLs without a base element', ['src/url-resolution.mts']],
