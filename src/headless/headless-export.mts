@@ -14,7 +14,8 @@
 
 import { startBrowserProcess } from './browser-process.mts';
 import type { HeadlessPage, HeadlessPageOptions } from './headless-types.mts';
-import { buildReadyExpression } from './ready-marker.mts';
+import { createLoadTracker } from './load-tracker.mts';
+import { assertReady, buildReadyExpression, type ReadyReply } from './ready-marker.mts';
 
 const defaultTimeoutMs = 120_000;
 
@@ -51,12 +52,30 @@ export async function openHeadlessPage(options: HeadlessPageOptions): Promise<He
     const load = async (): Promise<HeadlessPage> => {
         const { targetId } = await client.send<{ targetId: string }>('Target.createTarget', { url: 'about:blank' });
         const { sessionId } = await client.send<{ sessionId: string }>('Target.attachToTarget', { targetId, flatten: true });
-        await client.send('Page.enable', {}, sessionId);
-        const navigation = await client.send<{ errorText?: string }>('Page.navigate', { url: options.url }, sessionId);
-        if (navigation.errorText) {
-            throw new Error(`The page could not be loaded: ${navigation.errorText}`);
+        // Subscribe before navigating so the `load` event can never be missed.
+        const tracker = createLoadTracker(sessionId);
+        const unsubscribe = client.onEvent((event) => tracker.handle(event));
+        try {
+            await client.send('Page.enable', {}, sessionId);
+            await client.send('Page.setLifecycleEventsEnabled', { enabled: true }, sessionId);
+            const navigation = await client.send<{ loaderId?: string; errorText?: string }>('Page.navigate', { url: options.url }, sessionId);
+            if (navigation.errorText) {
+                throw new Error(`The page could not be loaded: ${navigation.errorText}`);
+            }
+            if (!navigation.loaderId) {
+                throw new Error('The browser did not start loading the page.');
+            }
+            // Until this document has loaded, a script would still run in the blank page shown before it.
+            await tracker.whenLoaded(navigation.loaderId);
+        } finally {
+            unsubscribe();
         }
-        await client.send('Runtime.evaluate', { expression: buildReadyExpression(options.waitForMarker), awaitPromise: true, returnByValue: true }, sessionId);
+        const ready = await client.send<ReadyReply>(
+            'Runtime.evaluate',
+            { expression: buildReadyExpression(options.waitForMarker), awaitPromise: true, returnByValue: true },
+            sessionId
+        );
+        assertReady(ready);
         return {
             send: <T = unknown,>(method: string, params?: object) => client.send<T>(method, params, sessionId),
             async dispose(): Promise<void> {

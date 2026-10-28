@@ -38,7 +38,7 @@ const baseScopes = [
         ['src/page-server-routes.mts', 'src/page-server.mts'],
     ],
     [
-        'headless',
+        'exportEngine',
         'the headless browser engine behind PDF and PNG export: DevTools pipe framing, browser discovery, the ready marker, and the Node-only process and page driver',
         ['src/headless/'],
     ],

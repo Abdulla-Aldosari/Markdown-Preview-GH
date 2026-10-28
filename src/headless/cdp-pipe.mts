@@ -43,7 +43,20 @@ export function createFrameDecoder(): FrameDecoder {
     };
 }
 
+/** A protocol event: a message the browser sends on its own, with no request behind it. */
+export interface CdpEvent {
+    method: string;
+    params: Record<string, unknown>;
+    /** The attached session the event belongs to; absent for browser-level events. */
+    sessionId?: string;
+}
+
 export interface CdpClient {
+    /**
+     * Subscribes to every protocol event.
+     * @returns A function that removes the subscription.
+     */
+    onEvent(listener: (event: CdpEvent) => void): () => void;
     /**
      * Sends a command and resolves with its `result`.
      * @param sessionId The attached target session; omit for browser-level commands.
@@ -66,6 +79,9 @@ interface ProtocolResponse {
     id?: unknown;
     result?: unknown;
     error?: { message?: unknown };
+    method?: unknown;
+    params?: unknown;
+    sessionId?: unknown;
 }
 
 /**
@@ -76,7 +92,19 @@ export function createCdpClient(write: (text: string) => void): CdpClient {
     const decoder = createFrameDecoder();
     const pending = new Map<number, PendingCommand>();
     let nextId = 1;
+    const listeners = new Set<(event: CdpEvent) => void>();
     let closedBecause: Error | undefined;
+
+    function dispatchEvent(message: ProtocolResponse): void {
+        if (typeof message.method !== 'string') {
+            return;
+        }
+        const params = typeof message.params === 'object' && message.params !== null ? (message.params as Record<string, unknown>) : {};
+        const event: CdpEvent = { method: message.method, params, ...(typeof message.sessionId === 'string' ? { sessionId: message.sessionId } : {}) };
+        for (const listener of [...listeners]) {
+            listener(event);
+        }
+    }
 
     function handleMessage(text: string): void {
         let message: ProtocolResponse;
@@ -85,8 +113,12 @@ export function createCdpClient(write: (text: string) => void): CdpClient {
         } catch {
             return;
         }
-        if (typeof message !== 'object' || message === null || typeof message.id !== 'number') {
-            // Events carry no id; nothing in the export flow listens to them.
+        if (typeof message !== 'object' || message === null) {
+            return;
+        }
+        if (typeof message.id !== 'number') {
+            // Events carry no id.
+            dispatchEvent(message);
             return;
         }
         const command = pending.get(message.id);
@@ -103,6 +135,12 @@ export function createCdpClient(write: (text: string) => void): CdpClient {
     }
 
     return {
+        onEvent(listener: (event: CdpEvent) => void): () => void {
+            listeners.add(listener);
+            return () => {
+                listeners.delete(listener);
+            };
+        },
         send<T = unknown>(method: string, params?: object, sessionId?: string): Promise<T> {
             if (closedBecause) {
                 return Promise.reject(closedBecause);

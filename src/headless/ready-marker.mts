@@ -14,6 +14,29 @@
 /** The attribute the export page sets on `<html>` when it is fully drawn. */
 export const readyMarkerAttribute = 'data-mpgh-ready';
 
+/** The part of the `Runtime.evaluate` reply the engine reads. */
+export interface ReadyReply {
+    result?: { value?: unknown };
+    exceptionDetails?: { text?: string; exception?: { description?: string } };
+}
+
+/**
+ * Checks the reply of the readiness expression. The protocol answers a
+ * script that threw or whose context was destroyed with a normal reply that
+ * carries `exceptionDetails`, so a missing check turns a page that never
+ * became ready into a silently incomplete export.
+ * @throws When the expression failed or did not resolve to `true`.
+ */
+export function assertReady(reply: ReadyReply): void {
+    if (reply.exceptionDetails) {
+        const detail = reply.exceptionDetails.exception?.description ?? reply.exceptionDetails.text ?? 'unknown error';
+        throw new Error(`The page did not become ready: ${detail}`);
+    }
+    if (reply.result?.value !== true) {
+        throw new Error('The page did not become ready.');
+    }
+}
+
 /**
  * Builds the expression the engine evaluates in the page. It resolves once
  * the `load` event has fired and, when the page draws diagrams, once the

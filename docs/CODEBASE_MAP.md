@@ -405,7 +405,14 @@ them, so the web bundle never contains this code.
   inside a multi-byte character, is returned once complete).
   `createCdpClient(write)` correlates each `send(method, params, sessionId)`
   with its response by `id`, rejects on a protocol error, ignores events, and
-  `close(reason)` rejects everything pending.
+  `close(reason)` rejects everything pending. `onEvent(listener)` delivers
+  every protocol event (`method`, `params`, optional `sessionId`) and returns
+  the function that unsubscribes.
+- `load-tracker.mts` - pure. `createLoadTracker(sessionId)` consumes the
+  events and `whenLoaded(loaderId)` resolves once the `Page.lifecycleEvent`
+  named `load` of that navigation has arrived (even if it came first).
+  `Page.navigate` answers when the document is committed, not loaded, so the
+  engine waits for this event before it evaluates anything.
 - `browser-locator.mts` - pure, with the file system, platform, environment,
   and `PATH` lookup injected. `locateBrowser(configuredPath, env)` returns
   `found` (`setting` or `detected`), `settingMissing` (a filled setting is
@@ -419,6 +426,9 @@ them, so the web bundle never contains this code.
   evaluates (it waits for `load` and, for diagram pages, for the marker). The
   `MutationObserver` is created before the first check and the `load` event
   re-runs the same check, so a marker set at any moment is seen.
+  `assertReady(reply)` rejects a `Runtime.evaluate` reply that carries
+  `exceptionDetails` or whose value is not `true` (the protocol reports a
+  script error as a normal reply).
 - `headless-types.mts` - the `HeadlessPageOptions` and `HeadlessPage`
   declarations shared with the injected interface.
 - `browser-process.mts` - desktop bundle only (`node:child_process`, `node:fs`,
@@ -432,8 +442,9 @@ them, so the web bundle never contains this code.
   temporary profile.
 - `headless-export.mts` - desktop bundle only. `openHeadlessPage({
 executablePath, url, waitForMarker, timeoutMs, signal })` creates and
-  attaches a target (flattened session), navigates, waits for readiness, and
-  returns a `HeadlessPage` whose `send` talks to that page. A timeout
+  attaches a target (flattened session), enables lifecycle events, navigates,
+  waits for the `load` event of that navigation, then evaluates the readiness
+  expression and checks its reply with `assertReady`, and returns a `HeadlessPage` whose `send` talks to that page. A timeout
   (default two minutes), an aborted signal, an early browser exit, or a
   failed navigation rejects and disposes the browser.
 
@@ -1023,13 +1034,17 @@ One test file per module, all run with `npm test`:
 - `test/page-server.test.mts` - real HTTP requests to the server: headers,
   `HEAD`, `404` and `405`, random tokens, both timeouts, and `dispose`.
 - `test/cdp-pipe.test.mts` - NUL framing (split chunks, multi-byte split,
-  several messages), id correlation, error responses, ignored events, `close`,
-  and a failing write.
+  several messages), id correlation, error responses, event delivery and
+  unsubscribe, ignored malformed messages, `close`, and a failing write.
+- `test/load-tracker.test.mts` - only the `load` of the awaited navigation
+  counts (not an earlier page's, another session's, or another event's), a
+  `load` that came first still resolves, and several waiters are released.
 - `test/browser-locator.test.mts` - the setting wins and is never replaced,
   Edge before Chrome on Windows, macOS bundles, and the Linux `PATH` order.
 - `test/ready-marker.test.mts` - the readiness expression is valid JavaScript,
   subscribes before its first check, resolves for a page without diagrams once
-  loaded, and for a page with diagrams only once the marker is set.
+  loaded, and for a page with diagrams only once the marker is set;
+  `assertReady` accepts only `true` and names the cause of an exception.
 - `test/pdf-export.test.mts` - the print parameters, base64 decoding, and the
   rejection of an empty reply or of data that is not a PDF.
 - `test/missing-browser.test.mts` - the notification text and buttons per
@@ -1052,8 +1067,9 @@ One test file per module, all run with `npm test`:
   keybinding with `{ resource, target }` and the output is a PDF.
 - `test/headless-export.test.mts` - the launch arguments, and (skipped when no
   browser is installed) a real browser that prints a PDF, waits for the ready
-  marker, stops on a timeout and on an aborted signal, and always deletes its
-  temporary profile; a missing executable fails clearly.
+  marker, hands over a page whose body arrives late complete (with and without
+  the marker), stops on a timeout and on an aborted signal, and always deletes
+  its temporary profile; a missing executable fails clearly.
 - `test/remote-open.test.mts` - the real desktop bundle activated against a
   remote-window stand-in: the page is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the

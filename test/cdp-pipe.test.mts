@@ -7,7 +7,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCdpClient, createFrameDecoder, encodeMessage } from '../src/headless/cdp-pipe.mts';
+import { createCdpClient, createFrameDecoder, encodeMessage, type CdpEvent } from '../src/headless/cdp-pipe.mts';
 
 const encoder = new TextEncoder();
 
@@ -54,12 +54,40 @@ test('an error response rejects the command with the method and message', async 
     await assert.rejects(pending, /Page\.navigate: Cannot navigate/);
 });
 
-test('events, malformed messages, and unknown ids are ignored', async () => {
+test('malformed messages and unknown ids are ignored', async () => {
     const client = createCdpClient(() => undefined);
     const pending = client.send('A.b');
-    client.receive(encoder.encode('{"method":"Page.loadEventFired","params":{}}\0not json\0{"id":99,"result":{}}\0'));
+    client.receive(encoder.encode('not json\0null\0{"id":99,"result":{}}\0{"nothing":true}\0'));
     client.receive(encoder.encode('{"id":1,"result":{"ok":true}}\0'));
     assert.deepEqual(await pending, { ok: true });
+});
+
+test('events reach every subscriber with their method, params, and session', () => {
+    const client = createCdpClient(() => undefined);
+    const first: CdpEvent[] = [];
+    const second: CdpEvent[] = [];
+    client.onEvent((event) => first.push(event));
+    client.onEvent((event) => second.push(event));
+    client.receive(encoder.encode('{"method":"Page.lifecycleEvent","params":{"name":"load"},"sessionId":"s1"}\0{"method":"Target.targetCreated"}\0'));
+    const expected = [
+        { method: 'Page.lifecycleEvent', params: { name: 'load' }, sessionId: 's1' },
+        { method: 'Target.targetCreated', params: {} },
+    ];
+    assert.deepEqual(JSON.parse(JSON.stringify(first)), expected);
+    assert.deepEqual(JSON.parse(JSON.stringify(second)), expected);
+});
+
+test('an unsubscribed listener hears nothing more, and a response is not an event', async () => {
+    const client = createCdpClient(() => undefined);
+    const heard: string[] = [];
+    const unsubscribe = client.onEvent((event) => heard.push(event.method));
+    client.receive(encoder.encode('{"method":"A.one"}\0'));
+    unsubscribe();
+    client.receive(encoder.encode('{"method":"A.two"}\0'));
+    const pending = client.send('A.b');
+    client.receive(encoder.encode('{"id":1,"result":{}}\0'));
+    await pending;
+    assert.deepEqual(heard, ['A.one']);
 });
 
 test('close rejects pending commands and refuses new ones', async () => {

@@ -7,7 +7,22 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildReadyExpression, readyMarkerAttribute } from '../src/headless/ready-marker.mts';
+import { assertReady, buildReadyExpression, readyMarkerAttribute } from '../src/headless/ready-marker.mts';
+
+test('assertReady accepts only a reply whose value is true', () => {
+    assert.doesNotThrow(() => assertReady({ result: { value: true } }));
+    assert.throws(() => assertReady({ result: { value: false } }), /did not become ready/);
+    assert.throws(() => assertReady({}), /did not become ready/);
+});
+
+test('assertReady turns exception details into an error that names the cause', () => {
+    assert.throws(
+        () => assertReady({ exceptionDetails: { text: 'Uncaught', exception: { description: 'TypeError: observe failed' } } }),
+        /did not become ready: TypeError: observe failed/
+    );
+    assert.throws(() => assertReady({ exceptionDetails: { text: 'Promise was collected' } }), /did not become ready: Promise was collected/);
+    assert.throws(() => assertReady({ exceptionDetails: {} }), /did not become ready: unknown error/);
+});
 
 test('the expression is valid JavaScript for both modes', () => {
     for (const waitForMarker of [true, false]) {
