@@ -444,7 +444,8 @@ them, so the web bundle never contains this code.
 executablePath, url, waitForMarker, timeoutMs, signal })` creates and
   attaches a target (flattened session), enables lifecycle events, navigates,
   waits for the `load` event of that navigation, then evaluates the readiness
-  expression and checks its reply with `assertReady`, and returns a `HeadlessPage` whose `send` talks to that page. A timeout
+  expression and checks its reply with `assertReady`, and returns a
+  `HeadlessPage` whose `send` talks to that page. A timeout
   (default two minutes), an aborted signal, an early browser exit, or a
   failed navigation rejects and disposes the browser.
 

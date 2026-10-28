@@ -140,8 +140,8 @@ These settings define the global defaults. Per-file preferences always take prio
 | Open in Browser, Print... | Yes     | Yes, through VS Code's port forwarding    | No                  |
 | Export As... > HTML       | Yes     | Yes                                       | Yes                 |
 | Export As... > PDF        | Yes     | Yes, with a browser on the remote machine | No                  |
-| Open File on GitHub       | Yes     | Not checked                               | No                  |
-| Copy This ... As PNG      | Yes     | Not checked                               | Not checked         |
+| Open File on GitHub       | Yes     | Yes, in WSL and SSH                       | No                  |
+| Copy This ... As PNG      | Yes     | Yes, in WSL and SSH                       | Yes                 |
 
 ## Troubleshooting
 
