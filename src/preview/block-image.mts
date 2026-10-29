@@ -303,16 +303,24 @@ interface DrawnBlock {
 
 /**
  * Builds the detached tree the image is made of: the subject, positioned as in
- * the page, on the page background. The tree is laid out at `zoom` (see
- * `layoutZoom`), so its sizes stay in the page's css pixels.
+ * the page, on the page background, with the corners rounded by `radius`. The
+ * tree is laid out at `zoom` (see `layoutZoom`), so its sizes stay in the
+ * page's css pixels.
  */
-function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[], width: number, height: number, zoom: number): { wrapper: Element; clones: Element[] } {
+function buildCaptureTree(
+    subject: readonly Element[],
+    rects: readonly DOMRect[],
+    width: number,
+    height: number,
+    zoom: number,
+    radius: number
+): { wrapper: Element; clones: Element[] } {
     const left = Math.min(...rects.map((rect) => rect.left));
     const top = Math.min(...rects.map((rect) => rect.top));
     const wrapper = document.createElementNS(xhtmlNamespace, 'div');
     wrapper.setAttribute(
         'style',
-        `zoom:${zoom};position:relative;box-sizing:border-box;width:${width}px;height:${height}px;overflow:hidden;background:${pageBackground(subject[0])};`
+        `zoom:${zoom};position:relative;box-sizing:border-box;width:${width}px;height:${height}px;overflow:hidden;background:${pageBackground(subject[0])};border-radius:${radius}px;`
     );
     const clones = subject.map((element, position) => {
         const clone = element.cloneNode(true) as Element;
@@ -332,7 +340,7 @@ function buildCaptureTree(subject: readonly Element[], rects: readonly DOMRect[]
 }
 
 /** Draws the subject on a canvas and returns it as a PNG. */
-async function drawSubject(subject: readonly Element[], scale: BlockImageScale, progress: ProgressSlot): Promise<DrawnBlock> {
+async function drawSubject(subject: readonly Element[], scale: BlockImageScale, radius: number, progress: ProgressSlot): Promise<DrawnBlock> {
     if (hasPendingDiagram(subject)) {
         throw new CopyFailure('rendering');
     }
@@ -350,7 +358,7 @@ async function drawSubject(subject: readonly Element[], scale: BlockImageScale, 
         throw new CopyFailure('tooManyNodes');
     }
     const zoom = layoutZoom(window.devicePixelRatio);
-    const { wrapper, clones } = buildCaptureTree(subject, rects, width, height, zoom);
+    const { wrapper, clones } = buildCaptureTree(subject, rects, width, height, zoom, radius);
     await embedPictures(subject, clones, progress);
     const markup = new XMLSerializer().serializeToString(wrapper);
     // The document is `zoom` times larger than the block; it is drawn back at the block's css size.
@@ -502,7 +510,7 @@ async function copyBlock(target: CaptureCommand): Promise<void> {
     // place, so the wait for the drawing and the clipboard is not left silent.
     const progress: ProgressSlot = { current: null };
     try {
-        const drawn = await drawSubject(resolveSubject(target), target.scale, progress);
+        const drawn = await drawSubject(resolveSubject(target), target.scale, target.radius, progress);
         if (!(await waitForFocus())) {
             throw new CopyFailure('focus');
         }

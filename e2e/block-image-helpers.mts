@@ -53,7 +53,7 @@ export const pngTitle = /^Copy This .* As PNG$/;
 export interface ClipboardImage {
     width: number;
     height: number;
-    /** The share of pixels that differ from the corner color, so a blank image reads as 0. */
+    /** The share of opaque pixels that differ from the page background, so a blank image reads as 0. */
     inkShare: number;
 }
 
@@ -228,10 +228,14 @@ export async function readClipboardImage(app: ElectronApplication): Promise<Clip
         }
         const { width, height } = image.getSize();
         const bitmap = image.toBitmap();
-        const background = [bitmap[0], bitmap[1], bitmap[2]];
+        // The page background fills the padding around the block, and the top
+        // edge center is always on it: the rounded corners sit at the far ends.
+        const backgroundOffset = Math.floor(width / 2) * 4;
+        const background = [bitmap[backgroundOffset], bitmap[backgroundOffset + 1], bitmap[backgroundOffset + 2]];
         let ink = 0;
         for (let offset = 0; offset < bitmap.length; offset += 4) {
-            if (bitmap[offset] !== background[0] || bitmap[offset + 1] !== background[1] || bitmap[offset + 2] !== background[2]) {
+            const opaque = bitmap[offset + 3] > 0;
+            if (opaque && (bitmap[offset] !== background[0] || bitmap[offset + 1] !== background[1] || bitmap[offset + 2] !== background[2])) {
                 ink++;
             }
         }
@@ -242,7 +246,7 @@ export async function readClipboardImage(app: ElectronApplication): Promise<Clip
 export interface PngAnalysis {
     width: number;
     height: number;
-    /** The first and last columns and rows that differ from the corner color. */
+    /** The first and last columns and rows of the content, ignoring the background and the transparent rounded corners. */
     left: number;
     right: number;
     top: number;
@@ -253,8 +257,10 @@ export interface PngAnalysis {
 
 /**
  * Measures where a PNG is painted, in a plain page (the PNG never reaches
- * VS Code's own window). The corner pixel is the background; the strips are
- * `band` pixels deep and hold the scrollbars a block would show.
+ * VS Code's own window). The opaque page background is sampled from the top
+ * edge center (the rounded corners sit at the far ends); a pixel counts as
+ * painted only when it is fully opaque and differs from that background. The
+ * strips are `band` pixels deep and hold the scrollbars a block would show.
  */
 export async function analyzePng(helper: Page, png: Buffer, band: number): Promise<PngAnalysis> {
     return helper.evaluate(
@@ -268,15 +274,20 @@ export async function analyzePng(helper: Page, png: Buffer, band: number): Promi
             context.drawImage(bitmap, 0, 0);
             const { width, height } = bitmap;
             const data = context.getImageData(0, 0, width, height).data;
-            const background = [data[0], data[1], data[2]];
+            const backgroundOffset = Math.floor(width / 2) * 4;
+            const background = [data[backgroundOffset], data[backgroundOffset + 1], data[backgroundOffset + 2]];
+            const painted = (x: number, y: number): boolean => {
+                const offset = (y * width + x) * 4;
+                const opaque = data[offset + 3] === 255;
+                return opaque && (data[offset] !== background[0] || data[offset + 1] !== background[1] || data[offset + 2] !== background[2]);
+            };
             let left = width;
             let right = -1;
             let top = height;
             let bottom = -1;
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
-                    const offset = (y * width + x) * 4;
-                    if (data[offset] !== background[0] || data[offset + 1] !== background[1] || data[offset + 2] !== background[2]) {
+                    if (painted(x, y)) {
                         left = Math.min(left, x);
                         right = Math.max(right, x);
                         top = Math.min(top, y);
@@ -304,6 +315,57 @@ export async function analyzePng(helper: Page, png: Buffer, band: number): Promi
             return { width, height, left, right, top, bottom, neutralGray: { bottom: grayBottom, right: grayRight } };
         },
         { base64: png.toString('base64'), strip: band }
+    );
+}
+
+/** The alpha of the four corners, the center of the top edge, and where the top-left corner ends. */
+export interface CornerSample {
+    topLeft: number;
+    topRight: number;
+    bottomLeft: number;
+    bottomRight: number;
+    topCenter: number;
+    /** The first x along the top edge whose pixel is at least half opaque: how far the top-left corner is rounded. */
+    topLeftOpaqueFrom: number;
+}
+
+/**
+ * Reads the alpha of a copied image's corners and of the center of its top
+ * edge. A rounded image has transparent corners (alpha 0) and an opaque top
+ * edge; a square image is opaque everywhere. `topLeftOpaqueFrom` is how far
+ * the top-left corner is rounded in image pixels (0 for square corners), so a
+ * larger radius pushes it further right.
+ */
+export async function sampleCorners(helper: Page, png: Buffer): Promise<CornerSample> {
+    return helper.evaluate(
+        async ({ base64 }) => {
+            const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+            const bitmap = await createImageBitmap(blob);
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(bitmap, 0, 0);
+            const { width, height } = bitmap;
+            const data = context.getImageData(0, 0, width, height).data;
+            const alpha = (x: number, y: number): number => data[(y * width + x) * 4 + 3];
+            let topLeftOpaqueFrom = width;
+            for (let x = 0; x < width; x++) {
+                if (alpha(x, 0) >= 128) {
+                    topLeftOpaqueFrom = x;
+                    break;
+                }
+            }
+            return {
+                topLeft: alpha(0, 0),
+                topRight: alpha(width - 1, 0),
+                bottomLeft: alpha(0, height - 1),
+                bottomRight: alpha(width - 1, height - 1),
+                topCenter: alpha(Math.floor(width / 2), 0),
+                topLeftOpaqueFrom,
+            };
+        },
+        { base64: png.toString('base64') }
     );
 }
 

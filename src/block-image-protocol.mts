@@ -64,7 +64,18 @@ export function isBlockImageScale(value: unknown): value is BlockImageScale {
     return typeof value === 'number' && (blockImageScales as readonly number[]).includes(value);
 }
 
-const captureIdPattern = new RegExp(`^mpgh-capture:(${blockKinds.join('|')}):(\\d{1,9}):(\\d(?:\\.\\d)?)$`);
+/** The corner radius used when the setting holds nothing usable, in CSS pixels. */
+export const defaultBlockImageRadius = 10;
+
+/** The largest radius an image can have: the 16-pixel padding around a block; a larger radius would cut into the block. */
+export const blockImageRadiusMax = 16;
+
+/** Whether a value is a usable corner radius: a whole number from 0 to the padding. */
+export function isBlockImageRadius(value: unknown): value is number {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= blockImageRadiusMax;
+}
+
+const captureIdPattern = new RegExp(`^mpgh-capture:(${blockKinds.join('|')}):(\\d{1,9}):(\\d(?:\\.\\d)?):(\\d{1,2})$`);
 
 /** What the page needs to find the block: its kind and its position among that kind. */
 export interface CaptureTarget {
@@ -72,9 +83,10 @@ export interface CaptureTarget {
     index: number;
 }
 
-/** What the page needs to make the image: the block, and the scale of the image. */
+/** What the page needs to make the image: the block, the scale, and the corner radius. */
 export interface CaptureCommand extends CaptureTarget {
     scale: BlockImageScale;
+    radius: number;
 }
 
 /** What a command needs: the document, and the block that was clicked. */
@@ -86,22 +98,23 @@ export function isBlockKind(value: unknown): value is BlockKind {
     return typeof value === 'string' && (blockKinds as readonly string[]).includes(value);
 }
 
-/** The `id` the host sends so that the page captures this block at this scale. */
-export function encodeCaptureId(target: CaptureTarget, scale: BlockImageScale): string {
-    return `mpgh-capture:${target.kind}:${target.index}:${scale}`;
+/** The `id` the host sends so that the page captures this block at this scale with these rounded corners. */
+export function encodeCaptureId(target: CaptureTarget, scale: BlockImageScale, radius: number): string {
+    return `mpgh-capture:${target.kind}:${target.index}:${scale}:${radius}`;
 }
 
-/** The block and scale a `copyImage` message names, or `null` for any other id (the built-in image ids included). */
+/** The block, scale, and corner radius a `copyImage` message names, or `null` for any other id (the built-in image ids included). */
 export function decodeCaptureId(id: unknown): CaptureCommand | null {
     if (typeof id !== 'string') {
         return null;
     }
     const match = captureIdPattern.exec(id);
     const scale = match ? Number(match[3]) : Number.NaN;
-    if (!match || !isBlockKind(match[1]) || !isBlockImageScale(scale)) {
+    const radius = match ? Number(match[4]) : Number.NaN;
+    if (!match || !isBlockKind(match[1]) || !isBlockImageScale(scale) || !isBlockImageRadius(radius)) {
         return null;
     }
-    return { kind: match[1], index: Number(match[2]), scale };
+    return { kind: match[1], index: Number(match[2]), scale, radius };
 }
 
 /**

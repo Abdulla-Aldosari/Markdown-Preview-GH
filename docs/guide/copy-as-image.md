@@ -35,6 +35,7 @@ These points apply to all four commands.
 
 - **Remote pictures** inside the copied part show a progress bar while they are fetched. If one cannot be fetched, the copy fails with a message that names the host, and nothing is copied: you get a complete image or none. A picture whose server does not allow it (a missing `Access-Control-Allow-Origin` header) fails this way, even though the preview shows it.
 - **Image size.** The `markdown-preview-gh.blockImageScale` setting (`1`, `1.5`, `2`, `2.5`, or `3`, default `1`) sets how many image pixels one pixel of the block becomes. `1` is the actual size of the block.
+- **Rounded corners.** The `markdown-preview-gh.blockImageRadius` setting (a whole number from `0` to `16`, default `10`) rounds the corners of the image. `0` keeps square corners; a rounded corner is transparent, so it takes the background of whatever you paste onto.
 
 ### The image can look smaller than the preview
 

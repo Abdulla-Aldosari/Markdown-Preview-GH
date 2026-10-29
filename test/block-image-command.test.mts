@@ -18,6 +18,7 @@ interface FakeHost extends BlockImageHost {
     keyWrites: boolean[];
     errors: string[];
     scale: BlockImageScale;
+    radius: number;
     explicit: boolean;
     noticeShown: boolean;
     noticeReply: boolean;
@@ -35,6 +36,7 @@ function createHost(commands: string[] = [copyImageCommandId]): FakeHost {
         keyWrites: [],
         errors: [],
         scale: 1,
+        radius: 10,
         explicit: false,
         noticeShown: false,
         noticeReply: false,
@@ -62,6 +64,9 @@ function createHost(commands: string[] = [copyImageCommandId]): FakeHost {
         },
         readScale() {
             return host.scale;
+        },
+        readRadius() {
+            return host.radius;
         },
         isScaleExplicit() {
             return host.explicit;
@@ -122,7 +127,7 @@ test('copy asks the preview to capture the block that was clicked', async () => 
     const host = createHost();
     await createBlockImageController(host).copy('table', clicked);
     assert.deepEqual(host.errors, []);
-    assert.deepEqual(host.executed, [{ id: copyImageCommandId, argument: { id: 'mpgh-capture:table:3:1', resource: clicked.resource } }]);
+    assert.deepEqual(host.executed, [{ id: copyImageCommandId, argument: { id: 'mpgh-capture:table:3:1:10', resource: clicked.resource } }]);
 });
 
 test('copy refuses a context that does not name its own kind', async () => {
@@ -168,11 +173,12 @@ test('copy reports a rejection that is not an Error', async () => {
     assert.deepEqual(host.errors, ['Could not copy the section as an image: plain text']);
 });
 
-test('copy asks for the scale of the setting', async () => {
+test('copy asks for the scale and radius of the settings', async () => {
     const host = createHost();
     host.scale = 2.5;
+    host.radius = 6;
     await createBlockImageController(host).copy('table', clicked);
-    assert.equal(host.executed[0].argument.id, 'mpgh-capture:table:3:2.5');
+    assert.equal(host.executed[0].argument.id, 'mpgh-capture:table:3:2.5:6');
 });
 
 /** Lets the notice, which is not waited for, run to its end. */

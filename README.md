@@ -132,6 +132,7 @@ These settings define the global defaults. Per-file preferences always take prio
 | `markdown-preview-gh.diagnosticLogging`  | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.                                |
 | `markdown-preview-gh.export.browserPath` | empty    | Full path of the Chromium-based browser used by **Export As... > PDF**. Empty detects one automatically. |
 | `markdown-preview-gh.blockImageScale`    | `1`      | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`.         |
+| `markdown-preview-gh.blockImageRadius`   | `10`     | Corner radius of the PNG made by **Copy This ... As PNG**: `0` (square) to `16`, in pixels.              |
 
 ## Where each feature works
 

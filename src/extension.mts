@@ -228,6 +228,7 @@ function registerBlockImageCommands(context: vscode.ExtensionContext): void {
         setAvailable: (available) => Promise.resolve(vscode.commands.executeCommand('setContext', availabilityContextKey, available)).then(() => undefined),
         showError: (message) => void vscode.window.showErrorMessage(message),
         readScale: () => readImageSettings(readConfiguration()).scale,
+        readRadius: () => readImageSettings(readConfiguration()).radius,
         isScaleExplicit: () => isSettingExplicit(readConfiguration(), BLOCK_IMAGE_SCALE_KEY),
         scaleNoticeShown: () => context.globalState.get<boolean>(blockImageScaleNoticeKey, false),
         markScaleNoticeShown: () => Promise.resolve(context.globalState.update(blockImageScaleNoticeKey, true)),

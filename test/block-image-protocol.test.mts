@@ -9,13 +9,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     blockCommandIds,
+    blockImageRadiusMax,
     blockImageScales,
     blockKinds,
     blockLabels,
     copyImageCommandId,
     decodeCaptureId,
+    defaultBlockImageRadius,
     defaultBlockImageScale,
     encodeCaptureId,
+    isBlockImageRadius,
     isBlockImageScale,
     isBlockKind,
     isCopyImageAvailable,
@@ -37,19 +40,21 @@ test('isBlockKind accepts only the known kinds', () => {
     }
 });
 
-test('a capture id round-trips for every kind, position, and scale', () => {
+test('a capture id round-trips for every kind, position, scale, and radius', () => {
     for (const kind of blockKinds) {
         for (const index of [0, 1, 17, 999_999_999]) {
             for (const scale of blockImageScales) {
-                assert.deepEqual(decodeCaptureId(encodeCaptureId({ kind, index }, scale)), { kind, index, scale });
+                for (const radius of [0, 10, 16]) {
+                    assert.deepEqual(decodeCaptureId(encodeCaptureId({ kind, index }, scale, radius)), { kind, index, scale, radius });
+                }
             }
         }
     }
 });
 
-test('the capture id carries the scale as the host wrote it', () => {
-    assert.equal(encodeCaptureId({ kind: 'table', index: 3 }, 1), 'mpgh-capture:table:3:1');
-    assert.equal(encodeCaptureId({ kind: 'section', index: 0 }, 2.5), 'mpgh-capture:section:0:2.5');
+test('the capture id carries the scale and radius as the host wrote them', () => {
+    assert.equal(encodeCaptureId({ kind: 'table', index: 3 }, 1, 10), 'mpgh-capture:table:3:1:10');
+    assert.equal(encodeCaptureId({ kind: 'section', index: 0 }, 2.5, 0), 'mpgh-capture:section:0:2.5:0');
 });
 
 test('decodeCaptureId ignores the ids of the built-in image copy and anything malformed', () => {
@@ -75,6 +80,12 @@ test('decodeCaptureId ignores the ids of the built-in image copy and anything ma
         'mpgh-capture:table:0:9',
         'mpgh-capture:table:0:-1',
         'mpgh-capture:table:0:1e0',
+        'mpgh-capture:table:0:1:',
+        'mpgh-capture:table:0:1:17',
+        'mpgh-capture:table:0:1:100',
+        'mpgh-capture:table:0:1:-1',
+        'mpgh-capture:table:0:1:1.5',
+        'mpgh-capture:table:0:1:0 ',
         undefined,
         null,
         7,
@@ -93,6 +104,17 @@ test('the allowed scales are 1, 1.5, 2, 2.5, and 3, and the default is the actua
     }
     for (const value of [0, 0.5, 1.25, 4, -1, Number.NaN, Number.POSITIVE_INFINITY, '2', null, undefined, {}]) {
         assert.equal(isBlockImageScale(value), false, String(value));
+    }
+});
+
+test('the corner radius is a whole number from 0 to the padding, and the default is 10', () => {
+    assert.equal(defaultBlockImageRadius, 10);
+    assert.equal(blockImageRadiusMax, 16);
+    for (const radius of [0, 1, 10, 16]) {
+        assert.equal(isBlockImageRadius(radius), true, String(radius));
+    }
+    for (const value of [-1, 17, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '10', null, undefined, {}]) {
+        assert.equal(isBlockImageRadius(value), false, String(value));
     }
 });
 test('readBlockRequest reads the merged context of the clicked block', () => {

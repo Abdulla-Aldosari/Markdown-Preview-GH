@@ -11,7 +11,7 @@
  * without the `vscode` API.
  */
 
-import { defaultBlockImageScale, isBlockImageScale, type BlockImageScale } from './block-image-protocol.mts';
+import { defaultBlockImageRadius, defaultBlockImageScale, isBlockImageRadius, isBlockImageScale, type BlockImageScale } from './block-image-protocol.mts';
 
 /** The minimal configuration surface the readers depend on. */
 export interface ConfigurationReader {
@@ -50,13 +50,22 @@ export function readThemeSettings(configuration: ConfigurationReader): { mode: s
 /** The key of the setting that holds the scale of the copied block images. */
 export const BLOCK_IMAGE_SCALE_KEY = 'blockImageScale';
 
+/** The key of the setting that holds the corner radius of the copied block images. */
+export const BLOCK_IMAGE_RADIUS_KEY = 'blockImageRadius';
+
 /**
- * Reads the scale of the copied block images: one of the allowed scales, and
- * the actual size (1) for anything else, a number written as text included.
+ * Reads the scale and corner radius of the copied block images. The scale is
+ * one of the allowed scales, the actual size (1) for anything else, a number
+ * written as text included. The radius is a whole number from 0 to the
+ * padding around the block, the default for anything else.
  */
-export function readImageSettings(configuration: ConfigurationReader): { scale: BlockImageScale } {
-    const value = configuration.get(BLOCK_IMAGE_SCALE_KEY);
-    return { scale: isBlockImageScale(value) ? value : defaultBlockImageScale };
+export function readImageSettings(configuration: ConfigurationReader): { scale: BlockImageScale; radius: number } {
+    const scale = configuration.get(BLOCK_IMAGE_SCALE_KEY);
+    const radius = configuration.get(BLOCK_IMAGE_RADIUS_KEY);
+    return {
+        scale: isBlockImageScale(scale) ? scale : defaultBlockImageScale,
+        radius: isBlockImageRadius(radius) ? radius : defaultBlockImageRadius,
+    };
 }
 
 /** Whether the user wrote a value for the setting (in the user, workspace, or folder settings), even one equal to the default. */

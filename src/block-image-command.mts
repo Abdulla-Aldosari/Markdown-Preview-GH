@@ -38,6 +38,8 @@ export interface BlockImageHost {
     showError(message: string): void;
     /** The scale the image is made at, from the settings. */
     readScale(): BlockImageScale;
+    /** The corner radius the image is made with, from the settings. */
+    readRadius(): number;
     /** Whether the user wrote a value for the scale setting, even one equal to the default. */
     isScaleExplicit(): boolean;
     /** Whether the one-time notice about the scale was already shown. */
@@ -115,8 +117,9 @@ export function createBlockImageController(host: BlockImageHost): BlockImageCont
             return;
         }
         const scale = host.readScale();
+        const radius = host.readRadius();
         try {
-            await host.executeCommand(copyImageCommandId, { id: encodeCaptureId(request, scale), resource: request.resource });
+            await host.executeCommand(copyImageCommandId, { id: encodeCaptureId(request, scale, radius), resource: request.resource });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             host.showError(`Could not copy the ${label} as an image: ${message}`);

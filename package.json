@@ -134,6 +134,14 @@
           ],
           "default": 1
         },
+        "markdown-preview-gh.blockImageRadius": {
+          "type": "number",
+          "order": 6,
+          "markdownDescription": "Corner radius of the PNG images made by the `Copy This ... As PNG` commands, in pixels of the block. `0` keeps square corners; the value is limited to the 16-pixel padding around the block so the content is never cut.",
+          "minimum": 0,
+          "maximum": 16,
+          "default": 10
+        },
         "markdown-preview-gh.export.browserPath": {
           "type": "string",
           "order": 4,
