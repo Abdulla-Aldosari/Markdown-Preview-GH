@@ -437,9 +437,26 @@ them, so the web bundle never contains this code.
 --password-store=basic --no-first-run --disable-extensions --disable-gpu
 --user-data-dir=<temp>`; `--password-store=basic` stops Chrome on Linux from
   creating a desktop keyring, whose password dialog would block the export),
-  and `startBrowserProcess`, which wires the pipes to a protocol client and
-  whose `dispose` kills the process (forced after 2 seconds) and deletes the
-  temporary profile.
+  and `startBrowserProcess`, which wires the pipes to a protocol client, keeps
+  the tail of the browser's standard error, ignores pipe errors (a dying
+  browser resets its pipes), and on an early exit closes the client with
+  `describeBrowserExit` after the standard error has closed (at most 500 ms).
+  Its `dispose` kills the process (forced after 2 seconds) and deletes the
+  temporary profile. `--no-sandbox` is never passed.
+- `browser-exit.mts` - pure. `createOutputTail(limit)` keeps the last 8192
+  characters of a stream (UTF-8 split across chunks is decoded once complete);
+  `isSandboxFailure(output)` recognizes `No usable sandbox` and
+  `Failed to move to new namespace`; `describeBrowserExit(code, signal,
+output)` names the exit code or the signal, then either explains a blocked
+  Linux sandbox or quotes the last three output lines (at most 500
+  characters). `createBrowserExitError` wraps that message in a
+  `BrowserExitError` whose `sandboxBlocked` flag survives the client's
+  rejection. `describePdfFailure(error)` builds the `Failed to export Markdown
+as PDF: ...` notification and, for a blocked sandbox only, the single button
+  `openGuideLabel` (`Open Troubleshooting Guide`); `guideUrlFor(label)` maps
+  that button to `sandboxGuideUrl`, the absolute address of the Troubleshooting
+  guide section, which `extension.mts` opens with `vscode.env.openExternal`.
+  The address is never part of the message text.
 - `headless-export.mts` - desktop bundle only. `openHeadlessPage({
 executablePath, url, waitForMarker, timeoutMs, signal })` creates and
   attaches a target (flattened session), enables lifecycle events, navigates,
@@ -1070,7 +1087,17 @@ One test file per module, all run with `npm test`:
   browser is installed) a real browser that prints a PDF, waits for the ready
   marker, hands over a page whose body arrives late complete (with and without
   the marker), stops on a timeout and on an aborted signal, and always deletes
-  its temporary profile; a missing executable fails clearly.
+  its temporary profile; a missing executable fails clearly, and a process
+  that exits at once (Node given the browser arguments) reports its exit code
+  and its standard error.
+- `test/browser-exit.test.mts` - the bounded output tail, both sandbox
+  failure texts, and the exit message for an exit code, a signal, a blocked
+  sandbox, and a long output; the failure notice and its guide button; the
+  guide link must match a heading of `docs/guide/troubleshooting.md`.
+- `test/pdf-command.test.mts` also drives a stand-in browser (a shell script
+  that prints `No usable sandbox!` and exits with 1; skipped on Windows)
+  through `exportPdf`: one error with the guide button, and the guide address
+  reaches `openExternal` only when the button is picked.
 - `test/remote-open.test.mts` - the real desktop bundle activated against a
   remote-window stand-in: the page is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the

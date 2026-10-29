@@ -26,6 +26,7 @@ import { createBlockImageController, type BlockImageController } from './block-i
 import { availabilityContextKey, blockCommandIds, blockKinds } from './block-image-protocol.mts';
 import type { BrowserLookup } from './headless/browser-locator.mts';
 import { describeMachine } from './headless/machine-label.mts';
+import { describePdfFailure, guideUrlFor } from './headless/browser-exit.mts';
 import { describeMissingBrowser, followUpCommand } from './headless/missing-browser.mts';
 import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
@@ -809,6 +810,16 @@ async function reportMissingBrowser(lookup: Exclude<BrowserLookup, { kind: 'foun
     }
 }
 
+/** Shows why the PDF export failed and opens the guide when the user picks that button. */
+async function reportPdfFailure(error: unknown): Promise<void> {
+    const notice = describePdfFailure(error);
+    const choice = await vscode.window.showErrorMessage(notice.message, ...notice.actions);
+    const guide = guideUrlFor(choice);
+    if (guide) {
+        await vscode.env.openExternal(vscode.Uri.parse(guide));
+    }
+}
+
 /**
  * Exports the target document as a PDF through an installed Chromium-based
  * browser. The page is always light, like `Print...`. The progress
@@ -852,8 +863,8 @@ async function exportPdfCommand(args: unknown): Promise<void> {
             void announceExportedFile(outputUri);
         }
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(`Failed to export Markdown as PDF: ${message}`);
+        // Not awaited: an open notification must not keep the repeat guard held.
+        void reportPdfFailure(error);
     } finally {
         release();
     }

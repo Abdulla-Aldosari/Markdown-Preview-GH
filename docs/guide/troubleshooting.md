@@ -21,6 +21,20 @@
 
 - **No browser was found.** PDF export needs Microsoft Edge, Google Chrome, or Chromium on the machine where the extension runs. In a remote window (WSL, SSH, Dev Containers) that is the remote machine, not your local computer. Install one there, or set `markdown-preview-gh.export.browserPath` to its full path. The message offers **Open Settings**, **Export as HTML instead**, and **Open in Browser (then Save as PDF)**.
 - **`browserPath` points to a file that does not exist.** The setting is never replaced by automatic detection; the message names the path so you can correct it.
+- **"The browser exited unexpectedly".** The message names the exit code or the signal that stopped the browser, and quotes the last lines the browser printed. Those lines usually name the cause, such as a missing system library.
+
+### The browser exits in a Dev Container
+
+The message says that the browser's sandbox could not start, and offers an **Open Troubleshooting Guide** button that opens this section. Chromium isolates every page in a sandbox built on Linux namespaces, and Docker's default seccomp profile blocks the system calls that create them, so Chromium stops at once. Installing the `chromium-sandbox` package does not help: the container refuses its helper too. The extension never turns the browser's sandbox off; allow it in `.devcontainer/devcontainer.json` instead, then run **Dev Containers: Rebuild Container**:
+
+```jsonc
+"runArgs": ["--security-opt", "seccomp=unconfined"],
+"postCreateCommand": "sudo apt-get update && sudo apt-get install -y chromium"
+```
+
+A rebuild creates a new container, so a browser installed by hand is gone afterwards; `postCreateCommand` installs it again. Leave that line out when the image already contains a browser.
+
+`seccomp=unconfined` removes the system-call filter from the whole container, not only from the browser. Use it for containers you trust.
 
 ## Diagnostic log
 

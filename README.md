@@ -135,13 +135,17 @@ These settings define the global defaults. Per-file preferences always take prio
 
 ## Where each feature works
 
-| Feature                   | Desktop | Remote window (WSL, SSH, Dev Containers)  | VS Code for the Web |
-| ------------------------- | ------- | ----------------------------------------- | ------------------- |
-| Open in Browser, Print... | Yes     | Yes, through VS Code's port forwarding    | No                  |
-| Export As... > HTML       | Yes     | Yes                                       | Yes                 |
-| Export As... > PDF        | Yes     | Yes, with a browser on the remote machine | No                  |
-| Open File on GitHub       | Yes     | Yes, in WSL and SSH                       | No                  |
-| Copy This ... As PNG      | Yes     | Yes, in WSL and SSH                       | Yes                 |
+| Feature                                                             | Desktop | Remote window (WSL, SSH, Dev Containers) | VS Code for the Web |
+| ------------------------------------------------------------------- | ------- | ---------------------------------------- | ------------------- |
+| <span style="white-space: nowrap;">Open in Browser, Print...</span> | Yes     | Yes                                      | No                  |
+| Export As... > HTML                                                 | Yes     | Yes                                      | Yes                 |
+| Export As... > PDF                                                  | Yes     | Yes                                      | No                  |
+| Open File on GitHub                                                 | Yes     | Yes                                      | No                  |
+| Copy This ... As PNG                                                | Yes     | Yes                                      | Yes                 |
+
+- **`Export As... > PDF`** needs a Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) on the machine where the extension runs. In a remote window that is the remote machine, not your local computer.
+
+- In a Dev Container, **`Export As... > PDF`** also needs [one container setting](docs/guide/troubleshooting.md#the-browser-exits-in-a-dev-container) that lets the browser start its sandbox.
 
 ## Troubleshooting
 

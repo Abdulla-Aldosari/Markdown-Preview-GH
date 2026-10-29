@@ -17,10 +17,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Readable, Writable } from 'node:stream';
+import { createBrowserExitError, createOutputTail } from './browser-exit.mts';
 import { locateBrowser, type BrowserLookup } from './browser-locator.mts';
 import { createCdpClient, type CdpClient } from './cdp-pipe.mts';
 
 const graceMs = 2_000;
+
+/** How long an exit waits for the last standard error output before it is reported. */
+const outputDrainMs = 500;
 
 /** The first executable named `name` on `PATH`, or `undefined`. */
 function findOnPath(name: string): string | undefined {
@@ -105,25 +109,47 @@ export async function startBrowserProcess(executablePath: string): Promise<Brows
     let child: ChildProcess;
     try {
         child = spawn(executablePath, buildBrowserArguments(profileDirectory), {
-            stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
+            stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'],
             windowsHide: true,
         });
     } catch (error) {
         await removeProfile(profileDirectory);
         throw error;
     }
+    const errorOutput = child.stdio[2] as Readable;
     const input = child.stdio[3] as Writable;
     const output = child.stdio[4] as Readable;
     const client = createCdpClient((text) => {
         input.write(text);
     });
+    // Always read standard error: a full pipe would block the browser, and its tail explains an early exit.
+    const errorTail = createOutputTail();
+    errorOutput.on('data', (chunk: Buffer) => errorTail.push(chunk));
     output.on('data', (chunk: Buffer) => client.receive(chunk));
+    // A browser that dies resets its pipes; the exit handler below reports why.
+    errorOutput.on('error', () => undefined);
     input.on('error', () => undefined);
+    output.on('error', () => undefined);
 
     const exited = new Promise<void>((resolve) => {
-        child.once('exit', (code) => {
-            client.close(new Error(`The browser exited unexpectedly (exit code ${code ?? 'unknown'}).`));
-            resolve();
+        child.once('exit', (code, signal) => {
+            let reported = false;
+            const report = (): void => {
+                if (reported) {
+                    return;
+                }
+                reported = true;
+                clearTimeout(drainTimer);
+                client.close(createBrowserExitError(code, signal, errorTail.text()));
+                resolve();
+            };
+            // The last lines can still be in the pipe when the exit arrives.
+            const drainTimer = setTimeout(report, outputDrainMs);
+            if (errorOutput.closed) {
+                report();
+            } else {
+                errorOutput.once('close', report);
+            }
         });
         child.once('error', (error) => {
             client.close(new Error(`The browser could not be started: ${error.message}`));

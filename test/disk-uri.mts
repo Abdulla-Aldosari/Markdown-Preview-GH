@@ -17,6 +17,7 @@ import path from 'node:path';
 export class DiskUri {
     readonly scheme = 'file';
     readonly fsPath: string;
+    #raw: string | undefined;
 
     constructor(fsPath: string) {
         this.fsPath = fsPath;
@@ -31,7 +32,13 @@ export class DiskUri {
     }
 
     static parse(raw: string): DiskUri {
-        return new DiskUri(decodeURIComponent(new URL(raw).pathname).replace(/^\/([A-Za-z]:)/, '$1'));
+        const parsed = new URL(raw);
+        const uri = new DiskUri(decodeURIComponent(parsed.pathname).replace(/^\/([A-Za-z]:)/, '$1'));
+        // A web address is not a file: keep it as written, so a test sees what was opened.
+        if (parsed.protocol !== 'file:') {
+            uri.#raw = raw;
+        }
+        return uri;
     }
 
     static joinPath(base: DiskUri, ...segments: string[]): DiskUri {
@@ -43,6 +50,9 @@ export class DiskUri {
     }
 
     toString(): string {
+        if (this.#raw) {
+            return this.#raw;
+        }
         return `file:///${this.fsPath.replace(/\\/g, '/').replace(/^\/+/, '')}`;
     }
 }

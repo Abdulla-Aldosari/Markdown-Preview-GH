@@ -43,6 +43,8 @@ export interface DesktopHarnessOptions {
 export interface DesktopHarness {
     errors: string[];
     errorActions: string[][];
+    /** The addresses passed to `vscode.env.openExternal`, in order. */
+    opened: string[];
     infos: string[];
     executed: Array<{ id: string; args: unknown[] }>;
     storage: string;
@@ -108,7 +110,7 @@ function createWindow(harness: DesktopHarness, options: DesktopHarnessOptions): 
 export async function activateDesktop(options: DesktopHarnessOptions): Promise<DesktopHarness> {
     const storage = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-harness-'));
     const commands = new Map<string, Handler>();
-    const harness: DesktopHarness = { errors: [], errorActions: [], infos: [], executed: [], storage, command: (id) => commands.get(id) as Handler };
+    const harness: DesktopHarness = { errors: [], errorActions: [], opened: [], infos: [], executed: [], storage, command: (id) => commands.get(id) as Handler };
     const document = { languageId: 'markdown', uri: DiskUri.file(path.join(storage, 'doc.md')) };
     const stub = {
         Uri: DiskUri,
@@ -138,7 +140,13 @@ export async function activateDesktop(options: DesktopHarnessOptions): Promise<D
             getWorkspaceFolder: () => undefined,
             fs: diskFileSystem,
         },
-        env: { remoteName: options.remoteName, openExternal: async () => true },
+        env: {
+            remoteName: options.remoteName,
+            openExternal: async (target: { toString(): string }) => {
+                harness.opened.push(target.toString());
+                return true;
+            },
+        },
     };
     const module = { exports: {} as Record<string, unknown> };
     const sandbox = {

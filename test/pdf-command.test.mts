@@ -95,10 +95,43 @@ test('a missing browser in a WSL window names the distribution and the remote ma
     assert.ok(harness.errors[0].includes(`was not found on ${expected} (not on your local computer)`), harness.errors[0]);
 });
 
+/** A stand-in browser that prints the sandbox failure of a container and exits, like Chromium does. Needs a POSIX shell. */
+function writeFakeSandboxBrowser(): string {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-fake-browser-')), 'chromium');
+    fs.writeFileSync(file, '#!/bin/sh\necho "[1:1:ERROR:zygote_host_impl_linux.cc:130] No usable sandbox! If you want to live dangerously, try --no-sandbox." >&2\nexit 1\n', {
+        mode: 0o755,
+    });
+    return file;
+}
+
+const skipFakeBrowser = process.platform === 'win32' ? 'a shell-script browser cannot be started on Windows' : false;
+
+for (const [name, choice, opened] of [
+    [
+        'picking the guide button opens the guide',
+        'Open Troubleshooting Guide',
+        ['https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/blob/main/docs/guide/troubleshooting.md#the-browser-exits-in-a-dev-container'],
+    ],
+    ['dismissing the notification opens nothing', undefined, []],
+] as const) {
+    test(`a browser that cannot start its sandbox is explained, and ${name}`, { skip: skipFakeBrowser }, async () => {
+        const harness = await activateDesktop({ browserPath: writeFakeSandboxBrowser(), markdown: plainBody, ...(choice ? { choice } : {}) });
+        await harness.command('markdown-preview-gh.exportPdf')({ resource, target: outputPath('sandbox.pdf') });
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(harness.errors.length, 1);
+        assert.match(harness.errors[0], /^Failed to export Markdown as PDF: The browser exited unexpectedly \(exit code 1\)\. Its sandbox could not start/);
+        assert.doesNotMatch(harness.errors[0], /https?:/);
+        assert.equal(JSON.stringify(harness.errorActions[0]), JSON.stringify(['Open Troubleshooting Guide']));
+        assert.equal(JSON.stringify(harness.opened), JSON.stringify(opened));
+        assert.deepEqual(leftoverBrowserProfiles(), []);
+    });
+}
+
 test('a render that returns no HTML fails with one error and cleans up', { skip }, async () => {
     const harness = await activateDesktop({ browserPath, markdown: undefined as unknown as string });
     await harness.command('markdown-preview-gh.exportPdf')({ resource, target: outputPath('bad.pdf') });
     assert.equal(harness.errors.length, 1);
     assert.match(harness.errors[0], /Failed to export Markdown as PDF/);
+    assert.equal(JSON.stringify(harness.errorActions[0]), JSON.stringify([]), 'an ordinary failure offers no button');
     assert.deepEqual(leftoverBrowserProfiles(), []);
 });

@@ -139,3 +139,13 @@ test('an executable that is not a browser fails with a clear error and cleans up
     );
     assert.equal(leftoverProfiles().length, before);
 });
+
+test('a process that exits at once reports its exit code and its standard error', async () => {
+    // Node refuses the browser arguments, prints why on standard error, and exits with code 9.
+    const before = leftoverProfiles().length;
+    await assert.rejects(openHeadlessPage({ executablePath: process.execPath, url: 'about:blank', waitForMarker: false, timeoutMs: 5000 }), (error: Error) => {
+        assert.match(error.message, /^The browser exited unexpectedly \(exit code 9\)\. Browser output: .*bad option: --/);
+        return true;
+    });
+    assert.equal(leftoverProfiles().length, before);
+});
