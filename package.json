@@ -653,6 +653,7 @@
     "@types/vscode": "1.106.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/test-web": "^0.0.81",
+    "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "git-cliff": "^2.14.2",
     "husky": "^9.1.7",
