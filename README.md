@@ -30,6 +30,8 @@ Fenced code blocks use GitHub's syntax highlighting and spacing. VS Code 1.132 a
 
 ![Code block example](images/readme/code-block-example.png)
 
+---
+
 ### Alerts, task lists, and emoji
 
 - `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes become colored callout boxes with icons.
@@ -38,17 +40,23 @@ Fenced code blocks use GitHub's syntax highlighting and spacing. VS Code 1.132 a
 
 ![Alerts example](images/readme/alerts-example.png)
 
+---
+
 ### Mermaid diagrams
 
 Fenced `mermaid` code blocks render as diagrams, ZenUML included. Diagrams follow the preview's theme, so they look right in light, dark, and per-file theme overrides.
 
 ![Mermaid example](images/readme/mermaid-example.png)
 
+---
+
 ### Right-to-left (RTL) support
 
 Set the content direction to `LTR`, `RTL`, or `Auto`, which detects it from the document. Code blocks always stay left-to-right, and when the direction is RTL the alert titles appear in Arabic.
 
 ![RTL language support example](images/readme/rtl-language-example.png)
+
+---
 
 ### Per-file preferences
 
@@ -60,9 +68,13 @@ Right-click inside the preview and open **Preferences** to set the width, the di
 
 Details: [Per-file preferences](docs/guide/preferences.md).
 
+---
+
 ### Zoom into images and diagrams
 
 Click an image or a Mermaid diagram to open it in a viewer that zooms and pans. Close it with `Esc`. Details: [Image and diagram viewer](docs/guide/image-viewer.md).
+
+---
 
 ### Copy as an image
 
@@ -72,7 +84,12 @@ Right-click a heading, a table, a code block, or a diagram and copy it to the cl
   <img src="https://raw.githubusercontent.com/Abdulla-Aldosari/repo-assets/main/Markdown-Preview-GH/readme/copy-this-section-as-png.gif" alt="Copy This Section As PNG, pasted into a GitHub issue and a Discord direct message" />
 </p>
 
-The image is made at the actual size of the block. If it looks small on your screen, raise the `markdown-preview-gh.blockImageScale` setting. Details: [Copy as an image](docs/guide/copy-as-image.md).
+- **Image size.** The image is made at the actual size of the block. If it looks small on your screen, raise the `markdown-preview-gh.blockImageScale` setting.
+- **Rounded corners.** The `markdown-preview-gh.blockImageRadius` setting rounds the corners of the PNG (default `10`; `0` keeps square corners).
+
+For more details, see [Copy as an image](docs/guide/copy-as-image.md).
+
+---
 
 ### Open in Browser, Print, and Export
 
@@ -86,9 +103,13 @@ The image is made at the actual size of the block. If it looks small on your scr
 
 Details: [Open in Browser, Print, and Export](docs/guide/export-and-print.md) and [Export without the save dialog](docs/guide/export-without-dialog.md).
 
+---
+
 ### Open File on GitHub
 
 Open the current file on github.com from the preview context menu. It appears only when git tracks the file in a repository that has a GitHub remote.
+
+---
 
 ## Installation
 
@@ -125,24 +146,24 @@ Right-click inside the preview to reach every command. Some are also listed in t
 These settings define the global defaults. Per-file preferences always take priority for the files they are set on.
 
 | Setting                                  | Default  | Description                                                                                              |
-| ---------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| `markdown-preview-gh.colorTheme`         | `auto`   | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.                          |
-| `markdown-preview-gh.contentDirection`   | `ltr`    | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                                  |
+| ---------------------------------------- | :------: | -------------------------------------------------------------------------------------------------------- |
+| `markdown-preview-gh.colorTheme`         |  `auto`  | How the preview picks its theme: `auto` (match the editor), `dark`, or `light`.                          |
+| `markdown-preview-gh.contentDirection`   |  `ltr`   | Content direction: `ltr`, `rtl`, or `auto` (detected from the content).                                  |
 | `markdown-preview-gh.contentWidth`       | `normal` | Content width: `narrow` (640px), `normal` (838px), `wide` (1024px), or `full` (1200px).                  |
 | `markdown-preview-gh.diagnosticLogging`  | `false`  | Writes diagnostic messages to the **Markdown Preview GH** output channel.                                |
-| `markdown-preview-gh.export.browserPath` | empty    | Full path of the Chromium-based browser used by **Export As... > PDF**. Empty detects one automatically. |
-| `markdown-preview-gh.blockImageScale`    | `1`      | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`.         |
-| `markdown-preview-gh.blockImageRadius`   | `10`     | Corner radius of the PNG made by **Copy This ... As PNG**: `0` (square) to `16`, in pixels.              |
+| `markdown-preview-gh.export.browserPath` |  empty   | Full path of the Chromium-based browser used by **Export As... > PDF**. Empty detects one automatically. |
+| `markdown-preview-gh.blockImageScale`    |   `1`    | Scale of the PNG made by **Copy This ... As PNG**: `1` (actual size), `1.5`, `2`, `2.5`, or `3`.         |
+| `markdown-preview-gh.blockImageRadius`   |   `10`   | Corner radius of the PNG made by **Copy This ... As PNG**: `0` (square) to `16`, in pixels.              |
 
 ## Where each feature works
 
 | Feature                                                             | Desktop | Remote window (WSL, SSH, Dev Containers) | VS Code for the Web |
-| ------------------------------------------------------------------- | ------- | ---------------------------------------- | ------------------- |
-| <span style="white-space: nowrap;">Open in Browser, Print...</span> | Yes     | Yes                                      | No                  |
-| Export As... > HTML                                                 | Yes     | Yes                                      | Yes                 |
-| Export As... > PDF                                                  | Yes     | Yes                                      | No                  |
-| Open File on GitHub                                                 | Yes     | Yes                                      | No                  |
-| Copy This ... As PNG                                                | Yes     | Yes                                      | Yes                 |
+| ------------------------------------------------------------------- | :-----: | ---------------------------------------- | ------------------- |
+| <span style="white-space: nowrap;">Open in Browser, Print...</span> |   Yes   | Yes                                      | No                  |
+| Export As... > HTML                                                 |   Yes   | Yes                                      | Yes                 |
+| Export As... > PDF                                                  |   Yes   | Yes                                      | No                  |
+| Open File on GitHub                                                 |   Yes   | Yes                                      | No                  |
+| Copy This ... As PNG                                                |   Yes   | Yes                                      | Yes                 |
 
 - **`Export As... > PDF`** needs a Chromium-based browser (Microsoft Edge, Google Chrome, or Chromium) on the machine where the extension runs. In a remote window that is the remote machine, not your local computer.
 
