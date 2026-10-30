@@ -1326,10 +1326,15 @@ One test file per module, all run with `npm test`:
   browser (`@vscode/test-web`, manual, run `npm run build` first) to check
   the web bundle and that the desktop-only commands are hidden.
 - `npm run package` - `vsce package` (runs `vscode:prepublish`, i.e. the
-  production build, first).
+  production build, first), using the `@vscode/vsce` pinned in
+  `devDependencies` instead of a global install.
 - `npm run prettier` - format the whole project with prettier.
 - `npm run prettier:check` - verify formatting without writing.
 - `npm run changelog` - regenerate `CHANGELOG.md` with git-cliff.
+- CI - the GitHub Actions workflow (`.github/workflows/ci.yml`): on push and
+  pull request, a Windows/macOS/Linux matrix runs `npm ci`, `npm run typecheck`,
+  `npm test`, `npm run build`, and `npm run package` with
+  `permissions: contents: read`.
 
 ## Commit tooling
 
