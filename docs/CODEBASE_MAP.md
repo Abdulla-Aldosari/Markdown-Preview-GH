@@ -42,7 +42,9 @@ stored in the workspace state takes priority over the global mode; a per-file
 - `dist/` - generated, gitignored runtime files: the esbuild bundles, the
   copied stylesheets, and the generated theme stylesheets. `main` in
   `package.json` points at `dist/extension.js` and `browser` at
-  `dist/extension-web.js`.
+  `dist/extension-web.js`; `extensionKind` is `["workspace"]`, so in a remote
+  window the extension runs on the remote machine, where the workspace files
+  and the headless browser coexist.
 - `build/` - TypeScript build scripts (`*.mts`): the theme pipeline, the
   bundler script, and the committed snapshot (`palettes/*.json`,
   `base-styles.css`).
@@ -180,6 +182,17 @@ Section As PNG` over `createBlockImageController` (see
   3000, and 8000 ms (the built-in Markdown extension may finish activating
   later), whenever `vscode.extensions.onDidChange` fires, and before every
   copy.
+
+### workspace-trust.mts
+
+The pure trust gate for the commands that build a standalone page. The
+exported page has no content security policy and markdown-it runs with
+`html: true`, so raw HTML such as `<script>` from the document would run in
+the browser or the headless PDF renderer. `evaluateTrustGate(isTrusted)`
+returns whether a gated command may run and the message shown when it may
+not; `extension.mts` wraps `exportHtmlLight`, `exportHtmlDark`, `exportPdf`,
+`openInBrowser`, and `print` with it, and the menus hide those commands with
+the built-in `isWorkspaceTrusted` context key.
 
 ### block-image-protocol.mts
 
@@ -1002,7 +1015,11 @@ The commands (`commands` and `webview/context` in `package.json`):
   direction, and theme; each stores a per-file override and refreshes the
   preview. `resetPreferences` clears the overrides of the file. The option
   commands are hidden from the Command Palette.
-- `openInBrowser`, `print` - standalone export to the browser.
+- `openInBrowser`, `print` - standalone export to the browser. Together with
+  `exportHtmlLight`, `exportHtmlDark`, and `exportPdf` they are hidden in
+  untrusted workspaces (`isWorkspaceTrusted`) and blocked at runtime by
+  `src/workspace-trust.mts`, because the standalone page has no content
+  security policy.
 - `openFileOnGitHub` - opens the current file on github.com.
 - `copyTableAsPng`, `copyCodeBlockAsPng`, `copyDiagramAsPng`,
   `copySectionAsPng` - titled `Copy This Table As PNG`, `Copy This Code Block
@@ -1057,6 +1074,11 @@ One test file per module, all run with `npm test`:
 - `test/image-embedding.test.mts` - MIME mapping, embeddable schemes, the
   size cap, de-duplication, failures, and base64 equality with `Buffer`.
 - `test/busy-guard.test.mts` - busy keys, independent keys, and stale releases.
+- `test/workspace-trust.test.mts` - the pure trust-gate decision for the
+  trusted and untrusted cases. `test/remote-open.test.mts` drives the real
+  desktop bundle and asserts the five gated commands are blocked when the
+  window is untrusted; `test/markdown-plugin.test.mts` locks that raw HTML
+  such as `<script>` passes through (the reason for the gate).
 - `test/page-server-routes.test.mts` - token encoding and uniqueness, exact
   route matching, and the local, served, and unsupported open modes.
 - `test/page-server.test.mts` - real HTTP requests to the server: headers,

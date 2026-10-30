@@ -58,7 +58,7 @@ test('the Export As submenu lists the three formats in order, PDF desktop only',
         ['markdown-preview-gh.exportHtmlLight', 'markdown-preview-gh.exportHtmlDark', 'markdown-preview-gh.exportPdf']
     );
     const byCommand = new Map(exportEntries.map((item) => [item.command, item.when]));
-    assert.equal(byCommand.get('markdown-preview-gh.exportPdf'), '!isWeb', 'PDF needs a desktop browser');
+    assert.equal(byCommand.get('markdown-preview-gh.exportPdf'), '!isWeb && isWorkspaceTrusted', 'PDF needs a desktop browser and a trusted workspace');
 });
 
 test('the Preferences submenu is declared once, hangs off the preview context menu, and sits before Reset', () => {
@@ -131,5 +131,5 @@ test('the block commands, their keys, and the preview scripts agree with the sou
 
 test('the PDF command is listed in the Command Palette for Markdown files on desktop only', () => {
     const palette = manifest.contributes.menus['commandPalette'];
-    assert.equal(palette.find((item) => item.command === 'markdown-preview-gh.exportPdf')?.when, 'editorLangId == markdown && !isWeb');
+    assert.equal(palette.find((item) => item.command === 'markdown-preview-gh.exportPdf')?.when, 'editorLangId == markdown && !isWeb && isWorkspaceTrusted');
 });

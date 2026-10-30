@@ -133,6 +133,7 @@ export async function activateDesktop(options: DesktopHarnessOptions): Promise<D
         },
         window: createWindow(harness, options),
         workspace: {
+            isTrusted: true,
             onDidChangeConfiguration: () => none,
             onDidOpenTextDocument: () => none,
             getConfiguration: () => ({ get: (key: string, fallback: unknown) => (key === 'export.browserPath' ? options.browserPath : fallback) }),

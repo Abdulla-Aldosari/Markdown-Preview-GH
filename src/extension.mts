@@ -31,6 +31,7 @@ import { describeMissingBrowser, followUpCommand } from './headless/missing-brow
 import { printPageToPdf } from './headless/pdf-export.mts';
 import { chooseOpenMode, type DesktopServices, type OpenMode } from './page-server-routes.mts';
 import { BLOCK_IMAGE_SCALE_KEY, CONFIG_SECTION, isSettingExplicit, readImageSettings, readLayoutSettings, readThemeSettings } from './preview-settings.mts';
+import { evaluateTrustGate } from './workspace-trust.mts';
 
 type CommandArgs = { resource?: string } | undefined;
 
@@ -44,6 +45,23 @@ let extensionContext: vscode.ExtensionContext | undefined;
 
 /** Node-only services injected by the desktop entry point; `undefined` in the web bundle. */
 let desktopServices: DesktopServices | undefined;
+
+/**
+ * Wraps a command handler so it refuses to run until the workspace is
+ * trusted. The menu `when` clauses already hide the gated commands in
+ * Restricted Mode; this guard is the last line of defense for invocations
+ * that bypass menus (keybindings, other extensions).
+ */
+function trustGated(handler: (args: unknown) => unknown): (args: unknown) => unknown {
+    return (args: unknown): unknown => {
+        const gate = evaluateTrustGate(vscode.workspace.isTrusted);
+        if (!gate.allowed) {
+            vscode.window.showErrorMessage(gate.message);
+            return undefined;
+        }
+        return handler(args);
+    };
+}
 
 function readConfiguration(): vscode.WorkspaceConfiguration {
     return vscode.workspace.getConfiguration(CONFIG_SECTION, null);
@@ -174,11 +192,26 @@ export function activate(context: vscode.ExtensionContext, services?: DesktopSer
 
     context.subscriptions.push(
         vscode.commands.registerCommand('markdown-preview-gh.resetPreferences', resetPreferencesCommand),
-        vscode.commands.registerCommand('markdown-preview-gh.openInBrowser', (args: unknown) => exportDocumentCommand(args, false)),
-        vscode.commands.registerCommand('markdown-preview-gh.print', (args: unknown) => exportDocumentCommand(args, true)),
-        vscode.commands.registerCommand('markdown-preview-gh.exportHtmlLight', (args: unknown) => exportHtmlCommand(args, 'light')),
-        vscode.commands.registerCommand('markdown-preview-gh.exportHtmlDark', (args: unknown) => exportHtmlCommand(args, 'dark')),
-        vscode.commands.registerCommand('markdown-preview-gh.exportPdf', (args: unknown) => exportPdfCommand(args)),
+        vscode.commands.registerCommand(
+            'markdown-preview-gh.openInBrowser',
+            trustGated((args: unknown) => exportDocumentCommand(args, false))
+        ),
+        vscode.commands.registerCommand(
+            'markdown-preview-gh.print',
+            trustGated((args: unknown) => exportDocumentCommand(args, true))
+        ),
+        vscode.commands.registerCommand(
+            'markdown-preview-gh.exportHtmlLight',
+            trustGated((args: unknown) => exportHtmlCommand(args, 'light'))
+        ),
+        vscode.commands.registerCommand(
+            'markdown-preview-gh.exportHtmlDark',
+            trustGated((args: unknown) => exportHtmlCommand(args, 'dark'))
+        ),
+        vscode.commands.registerCommand(
+            'markdown-preview-gh.exportPdf',
+            trustGated((args: unknown) => exportPdfCommand(args))
+        ),
         vscode.commands.registerCommand('markdown-preview-gh.openFileOnGitHub', (args: unknown) => openFileOnGitHubCommand(args))
     );
 

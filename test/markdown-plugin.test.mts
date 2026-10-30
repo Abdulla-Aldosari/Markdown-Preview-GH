@@ -180,3 +180,13 @@ test('reclassifyMermaidPlaceholders leaves other code blocks untouched', () => {
     const html = '<pre class="language-js"><code>x</code></pre><div class="mermaid2">y</div>';
     assert.equal(reclassifyMermaidPlaceholders(html), html);
 });
+
+test('raw inline HTML such as <script> is passed through, so export must stay trust-gated', () => {
+    // VS Code configures the Markdown engine with html: true, and this plugin
+    // must not sanitize raw HTML. This documents the risk behind the
+    // workspace-trust gate: an untrusted workspace's <script> would run in the
+    // standalone exported page (which has no content security policy).
+    const md = new MarkdownIt({ html: true }).use(createGfmPlugin(() => defaultOptions));
+    const html = md.render('<script>alert("x")</script>\n');
+    assert.match(html, /<script>alert\("x"\)<\/script>/);
+});

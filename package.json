@@ -34,6 +34,19 @@
   "activationEvents": [],
   "main": "dist/extension.js",
   "browser": "dist/extension-web.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The GitHub-style preview, Mermaid diagrams, and RTL rendering work in Restricted Mode. Export As, Open in Browser, and Print are disabled until the workspace is trusted."
+    },
+    "virtualWorkspaces": {
+      "supported": "limited",
+      "description": "The GitHub-style preview, Mermaid diagrams, and RTL rendering work in virtual workspaces. Export As, Open in Browser, and Print require a local file system and are unavailable there."
+    }
+  },
   "contributes": {
     "markdown.markdownItPlugins": true,
     "markdown.previewScripts": [
@@ -322,15 +335,17 @@
       "markdown-preview-gh.exportAs": [
         {
           "command": "markdown-preview-gh.exportHtmlLight",
+          "when": "isWorkspaceTrusted",
           "group": "1_export@1"
         },
         {
           "command": "markdown-preview-gh.exportHtmlDark",
+          "when": "isWorkspaceTrusted",
           "group": "1_export@2"
         },
         {
           "command": "markdown-preview-gh.exportPdf",
-          "when": "!isWeb",
+          "when": "!isWeb && isWorkspaceTrusted",
           "group": "1_export@3"
         }
       ],
@@ -421,23 +436,23 @@
         },
         {
           "command": "markdown-preview-gh.openInBrowser",
-          "when": "editorLangId == markdown && !isWeb"
+          "when": "editorLangId == markdown && !isWeb && isWorkspaceTrusted"
         },
         {
           "command": "markdown-preview-gh.print",
-          "when": "editorLangId == markdown && !isWeb"
+          "when": "editorLangId == markdown && !isWeb && isWorkspaceTrusted"
         },
         {
           "command": "markdown-preview-gh.exportHtmlLight",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown && isWorkspaceTrusted"
         },
         {
           "command": "markdown-preview-gh.exportHtmlDark",
-          "when": "editorLangId == markdown"
+          "when": "editorLangId == markdown && isWorkspaceTrusted"
         },
         {
           "command": "markdown-preview-gh.exportPdf",
-          "when": "editorLangId == markdown && !isWeb"
+          "when": "editorLangId == markdown && !isWeb && isWorkspaceTrusted"
         },
         {
           "command": "markdown-preview-gh.copyTableAsPng",
@@ -479,17 +494,17 @@
         },
         {
           "command": "markdown-preview-gh.openInBrowser",
-          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb && isWorkspaceTrusted",
           "group": "z_gmpExport@1"
         },
         {
           "command": "markdown-preview-gh.print",
-          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && !isWeb && isWorkspaceTrusted",
           "group": "z_gmpExport@2"
         },
         {
           "submenu": "markdown-preview-gh.exportAs",
-          "when": "webviewId == 'markdown.preview' && !mpghViewer",
+          "when": "webviewId == 'markdown.preview' && !mpghViewer && isWorkspaceTrusted",
           "group": "z_gmpExport@3"
         },
         {

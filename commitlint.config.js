@@ -43,6 +43,7 @@ const baseScopes = [
         ['src/headless/'],
     ],
     ['githubUrl', 'GitHub remote parsing and GitHub file URL building', ['src/github-url.mts']],
+    ['workspaceTrust', 'the trust gate that blocks Export As, Open in Browser, and Print in untrusted workspaces', ['src/workspace-trust.mts']],
     [
         'mermaid-preview',
         'the Mermaid preview webview script and its pure decision logic: diagram theming, SVG caching, sequential rendering, lazy library loading, and the export renderer',

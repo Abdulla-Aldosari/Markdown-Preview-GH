@@ -71,6 +71,8 @@ interface WindowOptions {
     openResult?: boolean;
     mapFails?: boolean;
     failWrite?: boolean;
+    /** The value of `vscode.workspace.isTrusted`; defaults to true (trusted). */
+    isTrusted?: boolean;
 }
 
 let desktopBundle: Promise<string> | undefined;
@@ -136,6 +138,7 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
             createOutputChannel: () => ({ appendLine: () => undefined }),
         },
         workspace: {
+            isTrusted: options.isTrusted ?? true,
             onDidChangeConfiguration: () => ({ dispose: () => undefined }),
             onDidOpenTextDocument: () => ({ dispose: () => undefined }),
             getConfiguration: () => ({ get: (_key: string, fallback: unknown) => fallback }),
@@ -348,6 +351,24 @@ test('Export As HTML still reports a failed write as an error', async () => {
     assert.equal(harness.errors.length, 1);
     assert.match(harness.errors[0], /Failed to export Markdown as HTML/);
     assert.deepEqual(harness.infos, []);
+});
+
+test('the gated commands are blocked in an untrusted workspace', async () => {
+    const harness = await activateWindow({ isTrusted: false });
+    await harness.command('markdown-preview-gh.exportHtmlLight')({ resource: documentUri, target: '/out/readme.html' });
+    await harness.command('markdown-preview-gh.exportPdf')({ resource: documentUri, target: '/out/readme.pdf' });
+    await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+    await harness.command('markdown-preview-gh.print')({ resource: documentUri });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(harness.written, [], 'nothing is written');
+    assert.deepEqual(harness.opened, [], 'nothing is opened');
+    assert.deepEqual(harness.infos, []);
+    assert.deepEqual(harness.errors, [
+        'Export As, Open in Browser, and Print are disabled until this workspace is trusted.',
+        'Export As, Open in Browser, and Print are disabled until this workspace is trusted.',
+        'Export As, Open in Browser, and Print are disabled until this workspace is trusted.',
+        'Export As, Open in Browser, and Print are disabled until this workspace is trusted.',
+    ]);
 });
 test('a repeated click while the page is being prepared opens nothing more', async () => {
     const harness = await activateWindow({ remoteName: 'ssh-remote' });
