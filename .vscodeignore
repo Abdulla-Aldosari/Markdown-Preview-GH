@@ -12,6 +12,7 @@ src/
 build/
 docs/
 images/readme/
+images/logo.svg
 e2e/
 playwright.config.ts
 test-results/
