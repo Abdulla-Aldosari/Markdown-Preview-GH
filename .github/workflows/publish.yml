@@ -31,9 +31,12 @@ jobs:
                     exit 1
                   fi
 
+            # This job has no checkout, so there is no git repository for gh to
+            # read the target repository from; GH_REPO names it explicitly.
             - name: Download the tested .vsix from the GitHub Release
               env:
                   GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
               run: gh release download "${{ inputs.tag }}" --pattern '*.vsix' --dir .
 
             - name: Publish the exact file (no rebuild)
