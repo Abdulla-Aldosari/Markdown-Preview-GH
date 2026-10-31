@@ -1335,6 +1335,13 @@ One test file per module, all run with `npm test`:
   pull request, a Windows/macOS/Linux matrix runs `npm ci`, `npm run typecheck`,
   `npm test`, `npm run build`, and `npm run package` with
   `permissions: contents: read`.
+- Publish - `.github/workflows/publish.yml` and `.github/workflows/publish-openvsx.yml`:
+  triggered only by `workflow_dispatch`, download the tested `.vsix` from the
+  GitHub Release, and publish it with `--packagePath` (no rebuild) to the
+  Visual Studio Marketplace (`vsce publish --oidc`) and Open VSX
+  (`ovsx publish`). Each takes an optional `gate` input checked against the
+  `RELEASE_GATE` secret; the gate is an anti-accident check only, not a
+  security secret.
 
 ## Commit tooling
 
