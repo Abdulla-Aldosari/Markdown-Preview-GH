@@ -669,5 +669,10 @@
   },
   "dependencies": {
     "mermaid": "11.16.1"
+  },
+  "overrides": {
+    "@zenuml/core": {
+      "playwright-core": "1.64.1"
+    }
   }
 }
