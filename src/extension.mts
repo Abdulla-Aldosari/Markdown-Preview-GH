@@ -15,7 +15,7 @@ import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
 import { resolveColorMode } from './color-mode.mts';
 import { preferenceOptions, type PreferenceKey, type PreferenceOption } from './preferences-menu.mts';
-import { buildStandaloneHtml, exportFileName, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
+import { buildStandaloneHtml, exportFileName, hasMathHtml, prepareMermaidHtml, resolveExportThemeMode, toLocalFileUri, type ThemeMode } from './export-html.mts';
 import { resolveDocumentUrls } from './url-resolution.mts';
 import { isUriString, prepareExportBody } from './export-body.mts';
 import type { ImageSource } from './image-embedding.mts';
@@ -610,6 +610,20 @@ async function readPreviewStyles(ctx: vscode.ExtensionContext): Promise<string> 
 }
 
 /**
+ * Reads the math stylesheet an exported page needs to show its formulas, or
+ * returns `undefined` for a document without formulas. The preview gets these
+ * rules from VS Code's own math extension, which a standalone page cannot
+ * reach, so the page carries its own copy with the fonts inlined.
+ */
+async function readKatexCss(ctx: vscode.ExtensionContext, bodyHtml: string): Promise<string | undefined> {
+    if (!hasMathHtml(bodyHtml)) {
+        return undefined;
+    }
+    const bytes = await vscode.workspace.fs.readFile(vscode.Uri.joinPath(ctx.extensionUri, 'dist', 'katex-export.css'));
+    return new TextDecoder('utf-8').decode(bytes);
+}
+
+/**
  * Reads the inline scripts the exported page needs to render its diagrams in
  * the browser, so the export command never opens a temporary webview in VS
  * Code: the small bootstrap plus the official minified UMD library builds
@@ -691,6 +705,7 @@ async function prepareAndOpenPage(ctx: vscode.ExtensionContext, uri: vscode.Uri,
     const prepared = prepareMermaidHtml(bodyHtml);
     const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
     const css = await readPreviewStyles(ctx);
+    const katexCss = await readKatexCss(ctx, prepared.html);
     const displayName = uri.path.split('/').pop() || 'document';
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
 
@@ -709,7 +724,7 @@ async function prepareAndOpenPage(ctx: vscode.ExtensionContext, uri: vscode.Uri,
                       },
             source: workspaceImageSource,
         });
-        const servedHtml = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, autoPrint, theme, ...scripts });
+        const servedHtml = buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, autoPrint, theme, katexCss, ...scripts });
         await openServedPage(ctx, servedHtml);
         return;
     }
@@ -722,7 +737,7 @@ async function prepareAndOpenPage(ctx: vscode.ExtensionContext, uri: vscode.Uri,
               }
             : undefined;
     const bodyWithUrls = resolveDocumentUrls(prepared.html, bases);
-    const html = buildStandaloneHtml({ title: displayName, bodyHtml: bodyWithUrls, css, autoPrint, theme, ...scripts });
+    const html = buildStandaloneHtml({ title: displayName, bodyHtml: bodyWithUrls, css, autoPrint, theme, katexCss, ...scripts });
 
     await vscode.workspace.fs.createDirectory(ctx.globalStorageUri);
     const outputUri = vscode.Uri.joinPath(ctx.globalStorageUri, exportFileName(uri.toString(), displayName));
@@ -812,6 +827,7 @@ async function buildEmbeddedPage(ctx: vscode.ExtensionContext, uri: vscode.Uri, 
     const prepared = prepareMermaidHtml(bodyHtml);
     const scripts = prepared.hasMermaid ? await readExportScripts(ctx, prepared.hasZenuml) : undefined;
     const css = await readPreviewStyles(ctx);
+    const katexCss = await readKatexCss(ctx, prepared.html);
     const displayName = uri.path.split('/').pop() || 'document';
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
     const body = await prepareExportBody(prepared.html, {
@@ -824,7 +840,7 @@ async function buildEmbeddedPage(ctx: vscode.ExtensionContext, uri: vscode.Uri, 
                   },
         source: workspaceImageSource,
     });
-    return { html: buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, ...scripts }), hasMermaid: prepared.hasMermaid };
+    return { html: buildStandaloneHtml({ title: displayName, bodyHtml: body.html, css, theme, katexCss, ...scripts }), hasMermaid: prepared.hasMermaid };
 }
 
 /** Guards the PDF export so a repeated click does not start a second browser. */

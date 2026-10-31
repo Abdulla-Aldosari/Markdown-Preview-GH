@@ -7,6 +7,7 @@ import {
     escapeHtml,
     exportFileName,
     forceTheme,
+    hasMathHtml,
     prepareMermaidHtml,
     resolveExportThemeMode,
     toLocalFileUri,
@@ -281,4 +282,35 @@ test('prepareMermaidHtml reports zenuml documents', () => {
     const { hasMermaid, hasZenuml } = prepareMermaidHtml(body);
     assert.equal(hasMermaid, true);
     assert.equal(hasZenuml, true);
+});
+
+const renderedFormula = `<p><span class="katex"><span class="katex-mathml"><math></math></span><span class="katex-html" aria-hidden="true">x</span></span></p>`;
+
+test('hasMathHtml recognizes a rendered formula, inline or block', () => {
+    assert.equal(hasMathHtml(renderedFormula), true);
+    assert.equal(hasMathHtml(`<section><eqn><span class="katex-display"><span class="katex">y</span></span></eqn></section>`), true);
+});
+
+test('hasMathHtml ignores text that only mentions the word', () => {
+    assert.equal(hasMathHtml(`<p>A katex mention and class names like katex-html alone</p>`), false);
+    assert.equal(hasMathHtml(`<p class="katex-like">plain</p>`), false);
+    assert.equal(hasMathHtml(''), false);
+});
+
+test('buildStandaloneHtml bakes the math stylesheet in only for a document with formulas', () => {
+    const katexCss = '.katex .katex-mathml{position:absolute}';
+    const withMath = buildStandaloneHtml({ title: 't', bodyHtml: renderedFormula, css: 'body{}', katexCss });
+    assert.ok(withMath.includes(katexCss));
+    const without = buildStandaloneHtml({ title: 't', bodyHtml: '<p>plain</p>', css: 'body{}', katexCss });
+    assert.ok(!without.includes(katexCss));
+});
+
+test('buildStandaloneHtml without a math stylesheet adds nothing, even with formulas', () => {
+    const page = buildStandaloneHtml({ title: 't', bodyHtml: renderedFormula, css: 'body{}' });
+    assert.ok(!page.includes('katex-mathml{'));
+});
+
+test('buildStandaloneHtml keeps the math stylesheet from closing the style element', () => {
+    const page = buildStandaloneHtml({ title: 't', bodyHtml: renderedFormula, css: '', katexCss: '.a{}</style><script>x</script>' });
+    assert.equal(page.match(/<\/style>/g)?.length, 1);
 });

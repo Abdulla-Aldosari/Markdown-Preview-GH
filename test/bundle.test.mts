@@ -12,7 +12,16 @@ import os from 'node:os';
 import path from 'node:path';
 import vm from 'node:vm';
 import * as esbuild from 'esbuild';
-import { STATIC_STYLESHEETS, copyExportLibraries, copyMermaidLibrary, copyStaticStylesheets, createBuildOptions } from '../build/bundle.mts';
+import {
+    KATEX_EXPORT_STYLESHEET,
+    STATIC_STYLESHEETS,
+    buildKatexExportCss,
+    copyExportLibraries,
+    copyKatexExportCss,
+    copyMermaidLibrary,
+    copyStaticStylesheets,
+    createBuildOptions,
+} from '../build/bundle.mts';
 
 /**
  * Builds every runtime bundle in memory and returns the output text keyed
@@ -187,6 +196,31 @@ test('copyStaticStylesheets copies every hand-written stylesheet byte for byte',
             const source = fs.readFileSync(new URL(`../src/styles/${name}`, import.meta.url));
             assert.ok(fs.readFileSync(path.join(outDir, name)).equals(source), name);
         }
+    } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+    }
+});
+
+test('the math stylesheet hides the accessibility copy and needs no file next to the page', () => {
+    const css = buildKatexExportCss();
+    assert.match(css, /\.katex \.katex-mathml\{[^}]*clip-path:inset\(50%\)[^}]*position:absolute[^}]*\}/, 'the hidden copy rule must be kept');
+    assert.equal((css.match(/@font-face/g) ?? []).length, 20, 'every font face must be kept');
+    assert.equal((css.match(/url\(data:font\/woff2;base64,/g) ?? []).length, 20, 'every font must be inlined');
+    assert.doesNotMatch(css, /url\((?!data:)/, 'no font may stay a relative or remote address');
+    assert.doesNotMatch(css, /\.woff\)|\.ttf\)/, 'the fallback formats must be dropped');
+});
+
+test('the inlined fonts are the woff2 files of the package, byte for byte', () => {
+    const css = buildKatexExportCss();
+    const font = fs.readFileSync(new URL('../node_modules/katex/dist/fonts/KaTeX_Main-Regular.woff2', import.meta.url));
+    assert.ok(css.includes(`data:font/woff2;base64,${font.toString('base64')}`));
+});
+
+test('copyKatexExportCss writes the math stylesheet into the output directory', () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mpgh-katex-css-'));
+    try {
+        copyKatexExportCss(outDir);
+        assert.equal(fs.readFileSync(path.join(outDir, KATEX_EXPORT_STYLESHEET), 'utf8'), buildKatexExportCss());
     } finally {
         fs.rmSync(outDir, { recursive: true, force: true });
     }

@@ -41,6 +41,9 @@
  * - `dist/zenuml.min.js`: the official minified UMD build of the zenuml
  *   plugin (carrying its own copy of Mermaid), baked inline only for
  *   documents that contain zenuml diagrams.
+ * - `dist/katex-export.css`: the math stylesheet with every font inlined as
+ *   a `data:` address, baked inline only into exported pages that contain
+ *   formulas.
  *
  * Usage:
  *   node ./build/bundle.mts [--production] [--watch]
@@ -176,6 +179,41 @@ export function copyStaticStylesheets(outDir: string): void {
     }
 }
 
+/** File name of the self-contained math stylesheet written into `dist/`. */
+export const KATEX_EXPORT_STYLESHEET = 'katex-export.css';
+
+/**
+ * Matches the `src` declaration of one KaTeX `@font-face`: the woff2 source
+ * followed by its woff and ttf fallbacks. Only the woff2 file is kept.
+ */
+const katexFontSource = /src:url\(fonts\/([^)]+)\.woff2\) format\("woff2"\)(?:,url\([^)]*\) format\("[^"]*"\))*/g;
+
+/**
+ * Builds the math stylesheet an exported page carries. The official KaTeX
+ * stylesheet points at its fonts with relative paths that cannot be resolved
+ * from a standalone page, so every font is replaced by a `data:` address of
+ * its woff2 file. The result needs no other file next to the page.
+ * @param katexDistDir The `dist` folder of the KaTeX package.
+ */
+export function buildKatexExportCss(katexDistDir: string = path.join(rootDir, 'node_modules', 'katex', 'dist')): string {
+    const css = fs.readFileSync(path.join(katexDistDir, 'katex.min.css'), 'utf8');
+    return css.replace(katexFontSource, (_declaration, name: string) => {
+        const font = fs.readFileSync(path.join(katexDistDir, 'fonts', `${name}.woff2`));
+        return `src:url(data:font/woff2;base64,${font.toString('base64')}) format("woff2")`;
+    });
+}
+
+/**
+ * Writes the math stylesheet into the output directory. The export command
+ * bakes it inline into exported pages that contain formulas, because the
+ * preview gets the same rules from VS Code's own math extension, which an
+ * exported page cannot reach.
+ */
+export function copyKatexExportCss(outDir: string): void {
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, KATEX_EXPORT_STYLESHEET), buildKatexExportCss());
+}
+
 /**
  * Copies the official minified UMD builds of the Mermaid library and the
  * zenuml plugin into the output directory. The export command bakes them
@@ -195,6 +233,7 @@ async function main(argv: string[]): Promise<void> {
     copyStaticStylesheets(outDir);
     copyMermaidLibrary(outDir);
     copyExportLibraries(outDir);
+    copyKatexExportCss(outDir);
     const configs = createBuildOptions({ production, outDir });
     if (watch) {
         for (const config of configs) {

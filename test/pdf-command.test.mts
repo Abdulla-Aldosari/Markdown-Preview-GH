@@ -29,6 +29,8 @@ const skip = browserPath ? false : 'no Chromium-based browser is installed';
 const resource = 'file:///x/doc.md';
 
 const plainBody = '<div class="mpgh-body" data-theme-mode="dark"><h1>Hello PDF</h1><p>Text with <code>code</code>.</p></div>';
+const mathBody =
+    '<div class="mpgh-body" data-theme-mode="dark"><p><span class="katex"><span class="katex-mathml"><math></math></span><span class="katex-html" aria-hidden="true">x</span></span></p></div>';
 const diagramBody = '<div class="mpgh-body" data-theme-mode="dark"><h1>Diagram</h1><pre class="mermaid">graph TD; A--&gt;B;</pre></div>';
 
 function outputPath(name: string): string {
@@ -54,6 +56,14 @@ test('exportPdf writes a real PDF for a page without diagrams and announces it',
 test('exportPdf waits for the diagrams of a page that carries them', { skip }, async () => {
     const harness = await activateDesktop({ browserPath, markdown: diagramBody });
     const target = outputPath('diagram.pdf');
+    await harness.command('markdown-preview-gh.exportPdf')({ resource, target });
+    assert.deepEqual(harness.errors, []);
+    assert.equal(fs.readFileSync(target).subarray(0, 5).toString('latin1'), '%PDF-');
+});
+
+test('exportPdf writes a real PDF for a page with formulas, reading the math stylesheet from dist', { skip }, async () => {
+    const harness = await activateDesktop({ browserPath, markdown: mathBody });
+    const target = outputPath('math.pdf');
     await harness.command('markdown-preview-gh.exportPdf')({ resource, target });
     assert.deepEqual(harness.errors, []);
     assert.equal(fs.readFileSync(target).subarray(0, 5).toString('latin1'), '%PDF-');

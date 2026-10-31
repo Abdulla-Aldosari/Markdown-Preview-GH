@@ -136,6 +136,27 @@ export interface StandaloneHtmlOptions {
      * documents that contain zenuml diagrams.
      */
     zenumlLibrary?: string;
+    /**
+     * The math stylesheet (rules and inlined fonts), baked into the page
+     * only for documents that contain formulas. Without it the hidden
+     * accessibility copy of every formula would show next to the drawing.
+     */
+    katexCss?: string;
+}
+
+/**
+ * Matches the root element of a rendered formula: a class attribute that
+ * holds `katex` as a whole class name, so `katex-html` or `katex-like` alone
+ * never match.
+ */
+const mathMarker = /class="(?:[^"]*\s)?katex(?:\s[^"]*)?"/;
+
+/**
+ * Reports whether the rendered body contains at least one formula, so the
+ * math stylesheet is added only to the pages that need it.
+ */
+export function hasMathHtml(bodyHtml: string): boolean {
+    return mathMarker.test(bodyHtml);
 }
 
 /**
@@ -188,10 +209,21 @@ ${mermaidScript}
         </script>`;
 }
 
-export function buildStandaloneHtml({ title, bodyHtml, css, autoPrint = false, theme = 'light', mermaidScript, mermaidLibrary, zenumlLibrary }: StandaloneHtmlOptions): string {
+export function buildStandaloneHtml({
+    title,
+    bodyHtml,
+    css,
+    autoPrint = false,
+    theme = 'light',
+    mermaidScript,
+    mermaidLibrary,
+    zenumlLibrary,
+    katexCss,
+}: StandaloneHtmlOptions): string {
+    const mathCss = katexCss && hasMathHtml(bodyHtml) ? `\n${sanitizeInlineCss(katexCss)}\n` : '';
     const printScript = autoPrint && !mermaidScript ? `<script>window.addEventListener('load', () => window.print());</script>` : '';
     const mermaidHtml = mermaidScript && mermaidLibrary ? mermaidExportHtml(autoPrint, mermaidScript, mermaidLibrary, zenumlLibrary) : '';
-    return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n\n        /* Browsers do not print element backgrounds by default; force the\n           code-block background so printed output matches the screen. */\n        @media print {\n            .mpgh-body pre {\n                -webkit-print-color-adjust: exact;\n                print-color-adjust: exact;\n            }\n        }\n${mermaidScript ? mermaidExportCss() : ''}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
+    return `<!DOCTYPE html>\n<html data-theme-mode="${theme}">\n    <head>\n        <meta charset="utf-8">\n        <meta name="viewport" content="width=device-width, initial-scale=1">\n        <meta name="color-scheme" content="${theme}">\n        <title>${escapeHtml(title)}</title>\n        <style>\n${sanitizeInlineCss(css)}\n        body {\n            background-color: var(--bgColor-default);\n        }\n\n        /* Browsers do not print element backgrounds by default; force the\n           code-block background so printed output matches the screen. */\n        @media print {\n            .mpgh-body pre {\n                -webkit-print-color-adjust: exact;\n                print-color-adjust: exact;\n            }\n        }\n${mermaidScript ? mermaidExportCss() : ''}${mathCss}${buildPrintLightThemeCss(css)}\n        </style>\n    </head>\n    <body class="vscode-body vscode-${theme}">\n        <div class="markdown-body" dir="auto">\n            ${forceTheme(bodyHtml, theme)}\n        </div>\n        ${mermaidHtml}${printScript}\n    </body>\n</html>\n`;
 }
 
 /**

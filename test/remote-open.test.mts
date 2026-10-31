@@ -62,6 +62,10 @@ interface Harness {
     progressTitles: string[];
     mapped: string[];
     written: string[];
+    /** The text of every file the extension wrote, in order. */
+    writtenContent: string[];
+    /** The path of every file the extension read through `workspace.fs`, in order. */
+    reads: string[];
     subscriptions: Array<{ dispose(): void }>;
     command(id: string): (args: unknown) => unknown;
 }
@@ -71,6 +75,8 @@ interface WindowOptions {
     openResult?: boolean;
     mapFails?: boolean;
     failWrite?: boolean;
+    /** What `markdown.api.render` returns; defaults to a plain document. */
+    body?: string;
     /** The value of `vscode.workspace.isTrusted`; defaults to true (trusted). */
     isTrusted?: boolean;
 }
@@ -95,6 +101,10 @@ function getDesktopBundle(): Promise<string> {
 
 const documentUri = 'file:///work/docs/readme.md';
 const bodyHtml = '<div class="mpgh-body" data-theme-mode="auto"><p>Hello <a href="other.md">link</a></p><img src="x.png" data-src="missing.png"></div>';
+const mathBody =
+    '<div class="mpgh-body" data-theme-mode="auto"><p><span class="katex"><span class="katex-mathml"><math></math></span><span class="katex-html" aria-hidden="true">x</span></span></p></div>';
+const mathStylesheetName = 'katex-export.css';
+const mathStylesheetMarker = '.mpgh-test-math-stylesheet{color:red}';
 
 /** Builds the `vscode` stand-in of one window kind and records what the extension does. */
 function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown) => unknown>, options: WindowOptions): Record<string, unknown> {
@@ -111,7 +121,7 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
                 commands.set(id, handler);
                 return { dispose: () => undefined };
             },
-            executeCommand: async (id: string) => (id === 'markdown.api.render' ? bodyHtml : undefined),
+            executeCommand: async (id: string) => (id === 'markdown.api.render' ? (options.body ?? bodyHtml) : undefined),
         },
         window: {
             activeTextEditor: undefined,
@@ -145,12 +155,16 @@ function createVscodeStub(harness: Harness, commands: Map<string, (args: unknown
             openTextDocument: async () => document,
             getWorkspaceFolder: () => undefined,
             fs: {
-                readFile: async () => new TextEncoder().encode(manifest),
-                writeFile: async (uri: FakeUri) => {
+                readFile: async (uri: FakeUri) => {
+                    harness.reads.push(uri.path);
+                    return new TextEncoder().encode(uri.path.endsWith(`/${mathStylesheetName}`) ? mathStylesheetMarker : manifest);
+                },
+                writeFile: async (uri: FakeUri, bytes: Uint8Array) => {
                     if (options.failWrite) {
                         throw new Error('disk full');
                     }
                     harness.written.push(uri.toString());
+                    harness.writtenContent.push(new TextDecoder('utf-8').decode(bytes));
                 },
                 createDirectory: async () => undefined,
                 stat: async () => {
@@ -187,6 +201,8 @@ async function activateWindow(options: WindowOptions): Promise<Harness> {
         progressTitles: [],
         mapped: [],
         written: [],
+        writtenContent: [],
+        reads: [],
         subscriptions: [],
         command: () => () => undefined,
     };
@@ -394,4 +410,68 @@ test('a failed preparation releases the guard and offers no ready notification',
     assert.equal(harness.errors.length, 2, 'the second attempt was not blocked');
     assert.deepEqual(harness.infos, []);
     stopServers(harness);
+});
+
+test('Open in Browser in a local window bakes the math stylesheet into a page with formulas', async () => {
+    const harness = await activateWindow({ body: mathBody });
+    await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+    assert.deepEqual(harness.errors, []);
+    assert.equal(harness.writtenContent.length, 1);
+    assert.ok(harness.writtenContent[0].includes(mathStylesheetMarker), 'the page carries the math stylesheet');
+    assert.ok(
+        harness.reads.some((read) => read.endsWith(`/dist/${mathStylesheetName}`)),
+        'the stylesheet is read from dist'
+    );
+});
+
+test('Open in Browser in a remote window serves the math stylesheet with a page with formulas', async () => {
+    const harness = await activateWindow({ remoteName: 'ssh-remote', body: mathBody });
+    try {
+        await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+        assert.deepEqual(harness.errors, []);
+        const html = await (await fetch(harness.opened[0])).text();
+        assert.ok(html.includes(mathStylesheetMarker), 'the served page carries the math stylesheet');
+    } finally {
+        stopServers(harness);
+    }
+});
+
+test('Print bakes the math stylesheet into a page with formulas', async () => {
+    const harness = await activateWindow({ body: mathBody });
+    await harness.command('markdown-preview-gh.print')({ resource: documentUri });
+    assert.deepEqual(harness.errors, []);
+    assert.ok(harness.writtenContent[0].includes(mathStylesheetMarker));
+    assert.match(harness.writtenContent[0], /window\.print\(\)/);
+});
+
+test('Export As HTML bakes the math stylesheet into a page with formulas, in both themes', async () => {
+    for (const command of ['markdown-preview-gh.exportHtmlLight', 'markdown-preview-gh.exportHtmlDark']) {
+        const harness = await activateWindow({ body: mathBody });
+        await harness.command(command)({ resource: documentUri, target: '/out/readme.html' });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        assert.deepEqual(harness.errors, [], command);
+        assert.equal(harness.writtenContent.length, 1, command);
+        assert.ok(harness.writtenContent[0].includes(mathStylesheetMarker), command);
+    }
+});
+
+test('a page without formulas never reads or carries the math stylesheet', async () => {
+    for (const run of [
+        async () => {
+            const harness = await activateWindow({});
+            await harness.command('markdown-preview-gh.openInBrowser')({ resource: documentUri });
+            return { harness, content: harness.writtenContent[0] };
+        },
+        async () => {
+            const harness = await activateWindow({});
+            await harness.command('markdown-preview-gh.exportHtmlLight')({ resource: documentUri, target: '/out/readme.html' });
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            return { harness, content: harness.writtenContent[0] };
+        },
+    ]) {
+        const { harness, content } = await run();
+        assert.ok(content, 'a page was written');
+        assert.ok(!content.includes(mathStylesheetMarker));
+        assert.ok(!harness.reads.some((read) => read.endsWith(`/${mathStylesheetName}`)), 'the stylesheet is not even read');
+    }
 });

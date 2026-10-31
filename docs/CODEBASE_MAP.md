@@ -326,6 +326,16 @@ Pure helpers for the standalone export page:
   script, and an always-baked `@media print` rule forcing
   `print-color-adjust: exact` (with the `-webkit-` fallback) on
   `.mpgh-body pre` so the code-block background survives printing.
+- `hasMathHtml(bodyHtml)` - reports whether the rendered body holds a
+  formula (an element whose class list contains `katex` as a whole name).
+  `buildStandaloneHtml` takes the optional `katexCss` and bakes it in only
+  when this is true, so a page without formulas stays unchanged. Without that
+  stylesheet the hidden accessibility copy of every formula (`.katex-mathml`)
+  shows as plain text next to the drawing: the preview gets the rule from
+  VS Code's own math extension, which a standalone page cannot reach.
+  `readKatexCss` in `extension.mts` reads `dist/katex-export.css` for the
+  three page builders (Open in Browser, the served page, and the embedded
+  page of PDF and HTML export).
 - `prepareMermaidHtml(bodyHtml)` - normalizes the Mermaid placeholders
   (`pre.mermaid` / `div.mermaid`, including the reclassified
   `mpgh-mermaid` class) of a rendered document: strips the
@@ -962,6 +972,12 @@ Bundles `src/` with esbuild and copies `src/styles/*.css` into `dist/`:
   diagrams.
 - `dist/zenuml.min.js` - the official minified UMD build of the zenuml
   plugin, baked inline only into exported pages that contain zenuml.
+- `dist/katex-export.css` - the official KaTeX stylesheet with each of its
+  20 fonts replaced by a `data:font/woff2` address (the woff and ttf
+  fallbacks are dropped), written by `copyKatexExportCss(outDir)` from
+  `buildKatexExportCss()`. Baked inline only into exported pages that contain
+  formulas; about 360 KB, so a page without formulas never carries it. It
+  comes from the `katex` package that `mermaid` already depends on.
 - `dist/zenuml.js` - a standalone ES module carrying Mermaid plus the
   zenuml diagram definition, loaded lazily by the preview only when a
   zenuml block exists.
@@ -1066,6 +1082,7 @@ One test file per module, all run with `npm test`:
   an option, the group order and labels, the plain and checked commands with
   opposite conditions, and the context values.
 - `test/export-html.test.mts` - `forceTheme`, `prepareMermaidHtml`,
+  `hasMathHtml`, the math stylesheet of `buildStandaloneHtml`,
   `buildStandaloneHtml`, `buildRendererPageHtml`, `parseRendererMessage`,
   `exportFileName`, `toLocalFileUri`, HTML escaping.
 - `test/url-resolution.test.mts` - every resolution rule: anchors,
@@ -1104,7 +1121,8 @@ One test file per module, all run with `npm test`:
   fallbacks for missing host facts, and `readHostInfo`.
 - `test/pdf-command.test.mts` - the real desktop bundle and the real browser
   through `exportPdf` (skipped without a browser): a PDF for a plain page and
-  for a page with diagrams, a cancellation that writes nothing, a missing
+  for a page with diagrams, a PDF for a page with formulas (reads
+  `dist/katex-export.css` from the real disk), a cancellation that writes nothing, a missing
   browser with its three buttons, and a render failure that leaves nothing
   behind.
 - `test/print-theme.test.mts` - with print media emulated in the real browser,
@@ -1131,7 +1149,13 @@ One test file per module, all run with `npm test`:
   through `exportPdf`: one error with the guide button, and the guide address
   reaches `openExternal` only when the button is picked.
 - `test/remote-open.test.mts` - the real desktop bundle activated against a
-  remote-window stand-in: the page is served and opened through the mapped
+  remote-window stand-in. Its math tests render a body with a formula and
+  check that `Open in Browser` (local and served), `Print...`, and both
+  `Export As HTML` themes bake the math stylesheet in, and that a page
+  without formulas neither carries nor even reads it. Deleting the
+  `katexCss` argument at any of the three page builders in `extension.mts`,
+  or the read in `readKatexCss`, fails these tests. Its other tests: the page
+  is served and opened through the mapped
   address, links stay as written, no `file://` leaks, `Print...` prints, the
   server stops on deactivation, mapping and open failures are reported, the
   only the progress bar appears for `Open in Browser` in both window kinds,
@@ -1215,7 +1239,11 @@ One test file per module, all run with `npm test`:
 - `test/preview-settings.test.mts` - the injected configuration readers,
   including the image scale (every allowed value, a fallback to 1 for any
   other, a number written as text included) and whether a setting was written.
-- `test/bundle.test.mts` - the bundle output: the desktop bundle requires
+- `test/bundle.test.mts` - also the math stylesheet: `buildKatexExportCss`
+  keeps the hiding rule and all 20 font faces, inlines every font as a
+  `data:` address (none stays a relative path), and the inlined fonts equal
+  the package's woff2 files byte for byte; `copyKatexExportCss` writes it.
+  The bundle output: the desktop bundle requires
   only `vscode` and `node:` built-ins, the web bundle requires only
   `vscode`, only the desktop bundle contains the page server and the headless
   engine, both export `activate`, the preview script, the block image script,
