@@ -6,11 +6,6 @@
 
 <h1 align="center">Markdown Preview GH</h1>
 
-<p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=Abdulla-Aldosari.markdown-preview-gh"><img src="https://vsmarketplacebadges.dev/version/Abdulla-Aldosari.markdown-preview-gh.svg" alt="Marketplace version" /></a>
-  <a href="https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Abdulla-Aldosari/Markdown-Preview-GH" alt="MIT license" /></a>
-</p>
-
 Preview Markdown in VS Code with GitHub's own typography, tables, and code blocks, in light and dark. Add Mermaid diagrams, right-to-left text, per-file layout, copy as PNG, and HTML or PDF export.
 
 ![Markdown Preview GH example](images/readme/main-screen.png)
@@ -114,6 +109,7 @@ Open the current file on github.com from the preview context menu. It appears on
 ## Installation
 
 - **From the Marketplace:** open the Extensions view in VS Code, search for `Markdown Preview GH`, and select **Install**. You can also install it from the [Marketplace page](https://marketplace.visualstudio.com/items?itemName=Abdulla-Aldosari.markdown-preview-gh).
+- **From Open VSX:** for VSCodium, Cursor, and other compatible editors, install it from the [Open VSX page](https://open-vsx.org/extension/Abdulla-Aldosari/markdown-preview-gh).
 - **From a VSIX file:** run `code --install-extension markdown-preview-gh-<version>.vsix`, or choose **Install from VSIX...** from the Extensions view menu.
 
 Requires VS Code 1.106.0 or later.
