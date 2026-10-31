@@ -37,6 +37,16 @@ Fenced code blocks use GitHub's syntax highlighting and spacing. VS Code 1.132 a
 
 ---
 
+### Math formulas
+
+Math formulas render in the preview, the same as in VS Code's built-in Markdown preview. Write `$$...$$` for a block formula, which is centered on its own line, or `$...$` for an inline formula, which sits within the text.
+
+<p align="center">
+  <img src="images/readme/math-formula-example.png" alt="Math formula example" />
+</p>
+
+---
+
 ### Mermaid diagrams
 
 Fenced `mermaid` code blocks render as diagrams, ZenUML included. Diagrams follow the preview's theme, so they look right in light, dark, and per-file theme overrides.
