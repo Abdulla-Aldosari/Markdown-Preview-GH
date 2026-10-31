@@ -1,5 +1,19 @@
 All notable changes to **[Markdown Preview GH](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH)** are documented here.<br>
 
+## [1.2.0](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/compare/v1.1.0..v1.2.0) - 2026-10-31
+
+### 🚀 Features
+
+- _(blockImage)_ Add configurable corner radius to block copies - ([0efb637](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/0efb63733e72ebb2df57d7f294be4bd60701e0df))
+- _(blockImage)_ Add a setting to control the copied image scale - ([94e53eb](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/94e53eb1896474753943a626a59713c8e679c3a5))
+- _(blockImage)_ Add the Copy This Block As PNG commands - ([85ffde1](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/85ffde1a65744d28152745bc1791854efc1534aa))
+- _(exportBody)_ Add Export As submenu with HTML export - ([d84114a](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/d84114a9783bc24791fda4291a096cfb75d0ddf7))
+- _(extension)_ Add the Export As PDF command - ([c53a5cb](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/c53a5cb93a8032f1b74aeccbdcb7a24210ab172c))
+- _(extension)_ Support Open in Browser in remote windows - ([6633707](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/6633707d9876a2e00f1f684a5aaaa7d71535114b))
+- _(imageViewer)_ Add zoomable image and diagram viewer - ([7b77a23](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/7b77a23eeadeeffd2ba06131b22135c9283dd710))
+- _(preferencesMenu)_ Add Preferences submenu to preview context menu - ([db4be7d](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/db4be7dea71beeaf9041b9da518800df63780ed1))
+- _(workspaceTrust)_ Disable export and open commands in untrusted workspaces - ([63a9b56](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/63a9b567f6c3c1d9c46e063885d4905a9488bc38))
+
 ## [1.1.0](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/compare/v1.0.0..v1.1.0) - 2026-10-21
 
 ### 🚀 Features
