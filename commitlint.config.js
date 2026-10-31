@@ -98,7 +98,7 @@ const baseScopes = [
     // General / cross-cutting
     ['deps', 'adding, removing, or bumping a dependency in package-lock.json (usually alongside package.json)', ['package-lock.json']],
     ['package', 'package.json metadata, scripts, manifest, or lint-staged config', ['package.json']],
-    ['config', 'a config file with no dedicated scope of its own', ['.gitignore', '.vscodeignore', 'tsconfig.json']],
+    ['config', 'a config file with no dedicated scope of its own', ['.gitignore', '.gitattributes', '.vscodeignore', 'tsconfig.json']],
     ['commitlint', 'commit type/scope rules for this project', ['commitlint.config.js']],
     ['husky', 'git hook scripts', ['.husky/']],
     ['cliff', 'cliff.toml changelog-generation configuration', ['cliff.toml']],

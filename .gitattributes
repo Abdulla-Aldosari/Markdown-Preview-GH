@@ -1,0 +1,4 @@
+# Force LF line endings for text files on every platform so the checked-out
+# tree is byte-identical everywhere. The theme-compose "hash lock" test and the
+# byte-stable dist/*.css guarantee depend on this.
+* text=auto eol=lf
