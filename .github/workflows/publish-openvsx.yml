@@ -1,0 +1,40 @@
+name: Publish Open VSX
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.0)'
+        required: true
+      gate:
+        description: 'Release gate (optional; checked only when RELEASE_GATE secret is set)'
+        required: false
+        default: ''
+
+# Least privilege: read the repository and request the OIDC token.
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # Anti-accident check, not a security secret: a stray manual run must
+      # pass the gate value or it stops here, before any publish.
+      - name: Verify release gate (if configured)
+        env:
+          EXPECTED_GATE: ${{ secrets.RELEASE_GATE }}
+        run: |
+          if [ -n "$EXPECTED_GATE" ] && [ "${{ inputs.gate }}" != "$EXPECTED_GATE" ]; then
+            echo "::error::Release gate mismatch; aborting."
+            exit 1
+          fi
+
+      - name: Download the tested .vsix from the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "${{ inputs.tag }}" --pattern '*.vsix' --dir .
+
+      - name: Publish the exact file (no rebuild)
+        run: npx --yes ovsx publish --packagePath ./*.vsix
