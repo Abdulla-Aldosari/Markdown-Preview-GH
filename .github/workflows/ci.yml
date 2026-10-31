@@ -1,44 +1,44 @@
 name: CI
 
 on:
-  push:
-  pull_request:
+    push:
+    pull_request:
 
 # GitHub recommends granting the workflow's GITHUB_TOKEN the least privilege it
 # needs. This workflow only reads the repository, so `contents: read` is enough.
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  verify:
-    name: Typecheck, test, build, and package (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      # Report every platform's result instead of stopping at the first failure.
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    verify:
+        name: Typecheck, test, build, and package (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            # Report every platform's result instead of stopping at the first failure.
+            fail-fast: false
+            matrix:
+                os: [windows-latest, macos-latest, ubuntu-latest]
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
+                  cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+            - name: Typecheck
+              run: npm run typecheck
 
-      - name: Test
-        run: npm test
+            - name: Test
+              run: npm test
 
-      - name: Build
-        run: npm run build
+            - name: Build
+              run: npm run build
 
-      - name: Package
-        run: npm run package
+            - name: Package
+              run: npm run package
