@@ -11,7 +11,7 @@ permissions:
 
 jobs:
     verify:
-        name: Typecheck, test, build, and package (${{ matrix.os }})
+        name: Typecheck, build, test, and package (${{ matrix.os }})
         runs-on: ${{ matrix.os }}
         strategy:
             # Report every platform's result instead of stopping at the first failure.
@@ -34,11 +34,11 @@ jobs:
             - name: Typecheck
               run: npm run typecheck
 
-            - name: Test
-              run: npm test
-
             - name: Build
               run: npm run build
+
+            - name: Test
+              run: npm test
 
             - name: Package
               run: npm run package
