@@ -27,13 +27,27 @@ Fenced code blocks use GitHub's syntax highlighting and spacing. VS Code 1.132 a
 
 ---
 
-### Alerts, task lists, and emoji
+### Alerts
 
-- `> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes become colored callout boxes with icons.
-- `- [ ]` and `- [x]` items render as read-only checkboxes.
-- `:tada:`, `:rocket:`, `:bug:`, and the rest of GitHub's shortcode set turn into their emoji.
+`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, and `[!CAUTION]` blockquotes become colored callout boxes with icons.
 
 ![Alerts example](images/readme/alerts-example.png)
+
+---
+
+### Task lists
+
+`- [ ]` and `- [x]` items render as read-only checkboxes.
+
+![Alerts example](images/readme/task-list-example.png)
+
+---
+
+### Emoji
+
+`:tada:`, `:rocket:`, `:bug:`, and the rest of GitHub's shortcode set turn into their emoji.
+
+![Alerts example](images/readme/emoji-example.png)
 
 ---
 
