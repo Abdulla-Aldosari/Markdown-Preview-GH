@@ -661,10 +661,20 @@ The block-to-image script, bundled into the classic script (IIFE)
   (`decodeCaptureId`, which carries the scale and corner radius of the
   settings), resolves the block, draws it at that scale with those rounded
   corners, waits for the focus the
-  clipboard needs (up to 5 s; the menu hands it back after it closes), writes
+  clipboard needs (up to `focusWaitMs` = 15 s; the menu hands it back after it
+  closes, and a user who left the preview must come back), writes
   the PNG with `navigator.clipboard.write`, and shows a short toast
   (`.mpgh-block-toast`, `role="status"`, or `role="alert"` for a failure).
-  Only one copy runs at a time.
+  Only one copy runs at a time. Every copy shows a working message with an
+  endless bar (`.mpgh-block-busy`, `role="status"`, `describeBusy`) as soon as
+  it starts, and waits for the next paint before drawing: the drawing holds the
+  page's only thread, so a delayed timer or an unpainted message would only
+  appear once the drawing is over. When the image is ready but the preview has
+  no focus, the same message becomes `describeFocusWait` ("Click the preview to
+  finish copying"). The fetch progress bar of remote pictures replaces it, and
+  the copy removes it, after at least `progressMinMs`, before the toast. The
+  bar keeps moving while the drawing runs: it animates only `transform`, which
+  the browser runs off the page's thread.
 
 Drawing: the subject (the block, or for a section the heading and every
 following sibling up to the next heading of the same or a higher rank) is

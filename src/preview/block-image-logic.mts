@@ -151,7 +151,7 @@ const failureText: Readonly<Record<FailureReason, string>> = {
     empty: 'it has nothing to draw.',
     tooLarge: 'it is too large to copy as one image.',
     tooManyNodes: 'it is too large to copy as an image. Pick a smaller block.',
-    focus: 'the preview did not have the focus. Click the preview and try again.',
+    focus: 'the preview lost the focus while the image was being prepared. Keep the preview in front until the copy finishes, then try again.',
     draw: 'the image could not be drawn.',
     clipboard: 'the clipboard refused the image.',
     picture: 'a remote picture could not be fetched.',
@@ -208,13 +208,26 @@ export function pngBlobFromDataUrl(url: string): Blob | null {
     }
 }
 
-/** How long the progress bar stays visible at least, so a fast fetch does not make it flash. */
+/** How long the progress bar and the working message stay visible at least, so a fast copy does not make them flash. */
 export const progressMinMs = 500;
 
 /** How much longer the progress bar must stay up to reach its minimum, never below 0. */
 export function remainingProgressMs(shownAt: number, now: number, minMs: number = progressMinMs): number {
     const elapsed = now - shownAt;
     return Number.isFinite(elapsed) ? Math.max(0, Math.ceil(minMs - elapsed)) : 0;
+}
+
+/** How long the copy waits for the preview to get the focus back once the image is ready. */
+export const focusWaitMs = 15000;
+
+/** The message shown while the image is being prepared. */
+export function describeBusy(label: string): string {
+    return `Copying the ${label} as an image. Keep the preview in front until it finishes.`;
+}
+
+/** The message shown when the image is ready but the preview has no focus, which the clipboard requires. */
+export function describeFocusWait(label: string): string {
+    return `The ${label} image is ready. Click the preview to finish copying.`;
 }
 
 /** The text of the progress shown while remote pictures are fetched. */

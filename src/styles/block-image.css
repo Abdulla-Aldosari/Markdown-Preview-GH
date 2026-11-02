@@ -8,6 +8,7 @@
  * of the VS Code window around it.
  */
 .mpgh-block-toast,
+.mpgh-block-busy,
 .mpgh-block-progress {
     position: fixed;
     left: 50%;
@@ -50,9 +51,47 @@
     stroke-linejoin: round;
 }
 
-.mpgh-block-progress {
+.mpgh-block-progress,
+.mpgh-block-busy {
     width: min(90vw, 360px);
     padding: 8px 16px 12px;
+}
+
+.mpgh-block-busy-track {
+    height: 4px;
+    margin-top: 6px;
+    border-radius: 2px;
+    background: var(--bgColor-neutral-muted, rgba(129, 139, 152, 0.12));
+    overflow: hidden;
+}
+
+/*
+ * An endless bar: the time of the drawing is not known. Only `transform` is
+ * animated, so the bar keeps moving while the drawing holds the page's thread.
+ */
+.mpgh-block-busy-fill {
+    width: 35%;
+    height: 100%;
+    background: var(--fgColor-accent, #0969da);
+    animation: mpgh-block-busy-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes mpgh-block-busy-slide {
+    from {
+        transform: translateX(-100%);
+    }
+
+    to {
+        transform: translateX(290%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mpgh-block-busy-fill {
+        width: 100%;
+        animation: none;
+        opacity: 0.6;
+    }
 }
 
 .mpgh-block-progress-track {

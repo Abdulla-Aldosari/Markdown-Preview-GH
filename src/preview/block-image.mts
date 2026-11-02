@@ -41,9 +41,12 @@ import {
     canRetryWithCors,
     capturePadding,
     clipsOverflow,
+    describeBusy,
     describeFailure,
+    describeFocusWait,
     describeProgress,
     describeSuccess,
+    focusWaitMs,
     isTransparentColor,
     layoutZoom,
     maxCaptureNodes,
@@ -60,10 +63,9 @@ const contentSelector = '.mpgh-content';
 const contextAttribute = 'data-vscode-context';
 const toastClass = 'mpgh-block-toast';
 const progressClass = 'mpgh-block-progress';
+const busyClass = 'mpgh-block-busy';
 const xhtmlNamespace = 'http://www.w3.org/1999/xhtml';
 const svgNamespace = 'http://www.w3.org/2000/svg';
-/** How long the page waits for the focus the clipboard needs after the menu closes. */
-const focusWaitMs = 5000;
 /** How long a picture may take to answer the CORS request before it is left out. */
 const corsWaitMs = 5000;
 const infoToastMs = 3000;
@@ -400,10 +402,11 @@ function pageBackground(subject: Element): string {
 }
 
 /** Resolves when the document has the focus, which the clipboard requires; the menu hands it back a moment after it closes. */
-function waitForFocus(): Promise<boolean> {
+function waitForFocus(onWaiting: () => void): Promise<boolean> {
     if (document.hasFocus()) {
         return Promise.resolve(true);
     }
+    onWaiting();
     return new Promise((resolve) => {
         const finish = (focused: boolean): void => {
             window.removeEventListener('focus', onFocus);
@@ -460,6 +463,8 @@ function showToast(message: string, failed: boolean): void {
  */
 function showProgress(total: number): ProgressBar {
     document.querySelector(`.${progressClass}`)?.remove();
+    // The bar of the fetch takes the place of the working message.
+    document.querySelector(`.${busyClass}`)?.remove();
     const root = document.createElement('div');
     root.className = progressClass;
     root.dataset.themeMode = readThemeMode();
@@ -487,6 +492,73 @@ function showProgress(total: number): ProgressBar {
     return { shownAt: performance.now(), update, remove: () => root.remove() };
 }
 
+/** The working message of one copy: it tells the user the image is being prepared, whatever the block holds. */
+interface BusyNotice {
+    /** Replaces the text of the message, and shows it again if a fetch bar took its place. */
+    show: (text: string) => void;
+    /** Removes the message once it has been visible for its minimum time, so it never flashes. */
+    close: () => Promise<void>;
+}
+
+/**
+ * A message with an endless bar, shown as soon as a copy starts, so a large
+ * block is not left silent. It is a status message for assistive technology
+ * (`role="status"`). A fetch progress bar replaces it while remote pictures
+ * load. It cannot wait on a timer before it appears: the drawing holds the
+ * page's only thread, so such a timer would fire only after the drawing ends.
+ */
+function showBusy(label: string): BusyNotice {
+    document.querySelector(`.${busyClass}`)?.remove();
+    const element = document.createElement('div');
+    element.className = busyClass;
+    element.dataset.themeMode = readThemeMode();
+    element.setAttribute('role', 'status');
+    const text = document.createElement('div');
+    text.textContent = describeBusy(label);
+    const track = document.createElement('div');
+    track.className = `${busyClass}-track`;
+    const fill = document.createElement('div');
+    fill.className = `${busyClass}-fill`;
+    track.append(fill);
+    element.append(text, track);
+    document.body.append(element);
+    const shownAt = performance.now();
+    return {
+        show: (message) => {
+            text.textContent = message;
+            if (!element.isConnected) {
+                document.body.append(element);
+            }
+        },
+        close: async () => {
+            if (element.isConnected) {
+                const wait = remainingProgressMs(shownAt, performance.now());
+                if (wait > 0) {
+                    await new Promise<void>((resolve) => window.setTimeout(resolve, wait));
+                }
+            }
+            element.remove();
+        },
+    };
+}
+
+/**
+ * Resolves once the browser has painted, so a message appended just before is
+ * on the screen when the drawing takes the thread. A preview that does not
+ * paint (hidden) is released by a short timer instead.
+ */
+function nextPaint(): Promise<void> {
+    return new Promise((resolve) => {
+        const fallback = window.setTimeout(resolve, 100);
+        window.requestAnimationFrame(() => {
+            window.setTimeout(() => {
+                window.clearTimeout(fallback);
+                resolve();
+            }, 0);
+        });
+    });
+}
+
 /** Keeps the progress bar of a copy up until it has been visible for its minimum time. */
 async function holdProgress(progress: ProgressSlot): Promise<void> {
     if (!progress.current) {
@@ -509,9 +581,18 @@ async function copyBlock(target: CaptureCommand): Promise<void> {
     // The bar of a copy with remote pictures stays until the message takes its
     // place, so the wait for the drawing and the clipboard is not left silent.
     const progress: ProgressSlot = { current: null };
+    const busy = showBusy(label);
     try {
-        const drawn = await drawSubject(resolveSubject(target), target.scale, target.radius, progress);
-        if (!(await waitForFocus())) {
+        const subject = resolveSubject(target);
+        // The drawing holds the thread, so the message must be on the screen before it starts.
+        await nextPaint();
+        const drawn = await drawSubject(subject, target.scale, target.radius, progress);
+        const onWaiting = (): void => {
+            // The image is ready, so the fetch bar has nothing left to tell; the request to click takes its place.
+            progress.current?.remove();
+            busy.show(describeFocusWait(label));
+        };
+        if (!(await waitForFocus(onWaiting))) {
             throw new CopyFailure('focus');
         }
         try {
@@ -519,11 +600,13 @@ async function copyBlock(target: CaptureCommand): Promise<void> {
         } catch {
             throw new CopyFailure('clipboard');
         }
+        await busy.close();
         await holdProgress(progress);
         progress.current?.remove();
         showToast(describeSuccess(label), false);
     } catch (error) {
         const failure = error instanceof CopyFailure ? error : new CopyFailure('draw');
+        await busy.close();
         await holdProgress(progress);
         progress.current?.remove();
         showToast(describeFailure(label, failure.reason, failure.pictures), true);

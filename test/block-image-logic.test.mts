@@ -13,9 +13,12 @@ import {
     canRetryWithCors,
     canvasLimits,
     clipsOverflow,
+    describeBusy,
     describeFailure,
+    describeFocusWait,
     describeProgress,
     describeSuccess,
+    focusWaitMs,
     headingLevel,
     isTransparentColor,
     layoutZoom,
@@ -192,7 +195,7 @@ test('isTransparentColor keeps every color that paints something', () => {
 
 test('the messages name the block and the cause', () => {
     assert.equal(describeFailure('table', 'tooLarge'), 'Could not copy the table as an image: it is too large to copy as one image.');
-    assert.match(describeFailure('code block', 'focus'), /^Could not copy the code block as an image: .*click the preview/i);
+    assert.match(describeFailure('code block', 'focus'), /^Could not copy the code block as an image: .*keep the preview in front/i);
     assert.equal(describeSuccess('diagram'), 'Copied the diagram as an image.');
 });
 
@@ -250,4 +253,10 @@ test('progressPercent stays within 0 to 100 and survives unusable input', () => 
     assert.equal(progressPercent(-2, 3), 0);
     assert.equal(progressPercent(1, 0), 0);
     assert.equal(progressPercent(Number.NaN, 3), 0);
+});
+
+test('the working and focus messages name the block and tell the user what to do', () => {
+    assert.equal(describeBusy('section'), 'Copying the section as an image. Keep the preview in front until it finishes.');
+    assert.equal(describeFocusWait('table'), 'The table image is ready. Click the preview to finish copying.');
+    assert.ok(focusWaitMs >= 10000, 'the copy waits long enough for the user to come back');
 });
