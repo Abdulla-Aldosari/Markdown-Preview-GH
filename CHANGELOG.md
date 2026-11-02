@@ -1,5 +1,12 @@
 All notable changes to **[Markdown Preview GH](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH)** are documented here.<br>
 
+## [1.2.1](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/compare/v1.2.0..v1.2.1) - 2026-11-02
+
+### 🐛 Bug Fixes
+
+- _(blockImage)_ Show progress while a block is copied as an image - ([9b28e5b](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/9b28e5b05422d43103365f9a5baa210400fcf4c3))
+- _(imageViewer)_ Open images while text is selected - ([d8bde5b](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/commit/d8bde5ba7214cceb756080287eb31a6ac0cde2d9))
+
 ## [1.2.0](https://github.com/Abdulla-Aldosari/Markdown-Preview-GH/compare/v1.1.0..v1.2.0) - 2026-10-31
 
 ### 🚀 Features
