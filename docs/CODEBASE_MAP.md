@@ -607,7 +607,9 @@ appended to `document.body` (outside the `.markdown-body` the preview
 replaces on every update), and removed on close. It:
 
 - opens with a click, except for images inside links, icon-sized content,
-  clicks with a modifier key, and clicks that end a text selection,
+  and clicks with a modifier key (an existing text selection does not block
+  it: a drag that selects text ends on a common ancestor, never on the
+  image, so such a click resolves to no subject),
 - shows a copy of the content at its natural size and positions it with a
   single `translate() scale()` transform: an `<img>` with the same source
   for images, a clone of the SVG for diagrams (the ids of the clone get a

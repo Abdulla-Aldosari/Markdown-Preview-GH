@@ -16,7 +16,6 @@ const base: ViewerClick = {
     button: 0,
     defaultPrevented: false,
     hasModifier: false,
-    hasSelection: false,
 };
 
 test('a plain primary click on a regular image opens the viewer', () => {
@@ -33,10 +32,9 @@ test('only the primary button opens the viewer', () => {
     assert.equal(canOpenViewer({ ...base, button: 2 }), false);
 });
 
-test('a handled click, a modified click, and a text selection never open it', () => {
+test('a handled click and a modified click never open it', () => {
     assert.equal(canOpenViewer({ ...base, defaultPrevented: true }), false);
     assert.equal(canOpenViewer({ ...base, hasModifier: true }), false);
-    assert.equal(canOpenViewer({ ...base, hasSelection: true }), false);
 });
 
 test('content without a known natural size is ignored (still loading, or broken)', () => {

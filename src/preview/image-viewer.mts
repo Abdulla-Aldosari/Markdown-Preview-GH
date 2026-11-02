@@ -563,11 +563,6 @@ function openViewer(subject: ResolvedSubject): void {
     s.overlay.focus({ preventScroll: true });
 }
 
-function hasTextSelection(): boolean {
-    const selection = window.getSelection();
-    return selection !== null && !selection.isCollapsed;
-}
-
 function handleDocumentClick(event: MouseEvent): void {
     if (session) {
         return;
@@ -581,7 +576,6 @@ function handleDocumentClick(event: MouseEvent): void {
         button: event.button,
         defaultPrevented: event.defaultPrevented,
         hasModifier: event.ctrlKey || event.metaKey || event.shiftKey || event.altKey,
-        hasSelection: hasTextSelection(),
     });
     if (allowed) {
         openViewer(subject);

@@ -31,8 +31,6 @@ export interface ViewerClick extends ViewerSubject {
     defaultPrevented: boolean;
     /** Whether ctrl, meta, shift, or alt was held. */
     hasModifier: boolean;
-    /** Whether the user has a text selection (the click then belongs to selecting). */
-    hasSelection: boolean;
 }
 
 /** Whether an image source is a vector format, which stays sharp when it is enlarged. */
@@ -53,7 +51,7 @@ export function isZoomableSubject({ natural, display, insideLink }: ViewerSubjec
 
 /** Whether the click opens the viewer. */
 export function canOpenViewer(click: ViewerClick): boolean {
-    if (click.button !== 0 || click.defaultPrevented || click.hasModifier || click.hasSelection) {
+    if (click.button !== 0 || click.defaultPrevented || click.hasModifier) {
         return false;
     }
     return isZoomableSubject(click);
