@@ -7,9 +7,8 @@ on:
                 description: 'Release tag (e.g. v1.2.0)'
                 required: true
             gate:
-                description: 'Release gate (optional; checked only when RELEASE_GATE secret is set)'
-                required: false
-                default: ''
+                description: 'Release gate (must match RELEASE_GATE secret)'
+                required: true
 
 # Least privilege: read the repository and request the OIDC token.
 permissions:
@@ -22,12 +21,17 @@ jobs:
         steps:
             # Anti-accident check, not a security secret: a stray manual run must
             # pass the gate value or it stops here, before any publish.
-            - name: Verify release gate (if configured)
+            - name: Verify release gate
               env:
                   EXPECTED_GATE: ${{ secrets.RELEASE_GATE }}
+                  PROVIDED_GATE: ${{ inputs.gate }}
               run: |
-                  if [ -n "$EXPECTED_GATE" ] && [ "${{ inputs.gate }}" != "$EXPECTED_GATE" ]; then
-                    echo "::error::Release gate mismatch; aborting."
+                  if [ -z "$EXPECTED_GATE" ]; then
+                    echo "::error::RELEASE_GATE secret is not configured. Publishing is blocked."
+                    exit 1
+                  fi
+                  if [ "$PROVIDED_GATE" != "$EXPECTED_GATE" ]; then
+                    echo "::error::Release gate mismatch. Publishing is blocked."
                     exit 1
                   fi
 
