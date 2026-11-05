@@ -105,7 +105,7 @@ const baseScopes = [
     ['prettier', 'formatting configuration', ['.prettierrc', '.prettierignore']],
     ['lintStaged', 'lint-staged configuration inside package.json', []],
     ['vscode', 'editor/debugger configuration', ['.vscode/']],
-    ['ciWorkflow', 'the GitHub Actions workflows (CI and publishing)', ['.github/']],
+    ['workflows', 'the GitHub Actions workflows (CI and publishing)', ['.github/']],
     ['release', 'release commits: initial releases and version bumps', []],
     ['format', 'a repo-wide formatting-only pass with no logic or behavior change', []],
 ];
